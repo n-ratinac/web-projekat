@@ -322,7 +322,7 @@
           this.dead = false;
         }
         get speed() {
-          return 16 / Math.sqrt(this.mass);
+          return 8 / Math.sqrt(this.mass);
         }
         update(tx, ty, dt) {
           const s = dt / 1000;
@@ -920,6 +920,11 @@
         if (player.cells.length === 0) {
           playerDead();
         }
+      }
+      function maybeSpawnBot() {
+        const randomNumber = Math.floor(Math.random() * 3600) + 1;
+        if (randomNumber <= 7)
+          bots.push(new Bot())
       }
 
       function respawnBots() {
