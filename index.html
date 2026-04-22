@@ -287,7 +287,14 @@
         reset() {
           this.x = rnd(20, WORLD - 20);
           this.y = rnd(20, WORLD - 20);
-          this.mass = rnd(1, 2);
+          const sansa = Math.random();
+          if (sansa < 0.6) {
+            this.mass = 1; 
+          } else if (sansa < 0.9) {
+            this.mass = 3; 
+          } else {
+            this.mass = 5; 
+          }
           this.r = massToR(this.mass);
           this.hue = rndInt(0, 360);
         }
@@ -725,7 +732,7 @@
 
       function drawFood(f, cam) {
         const [sx, sy] = worldToScreen(f.x, f.y, cam);
-        const sr = Math.max(2, f.r * cam.zoom);
+        const sr = Math.max(4, f.r * 1.5 * cam.zoom);
         if (
           sx + sr < 0 ||
           sx - sr > canvas.width ||
