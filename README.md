@@ -14,5 +14,5 @@ U powershell-u, otići u neki direktorijum gde imate pune permisije i izvršiti 
 
 ```sh
 git clone https://github.com/n-ratinac/web-projekat.git
-cd web-projekat
+code web-projekat
 ```
