@@ -952,8 +952,8 @@
           f.y += f.vy;
           f.vx *= 0.9;
           f.vy *= 0.9;
-          f.x = clamp(f.x, 0, WORLD);
-          f.y = clamp(f.y, 0, WORLD);
+          f.x = clamp(f.x, f.r, WORLD - f.r);
+          f.y = clamp(f.y, f.r, WORLD - f.r);
           // check virus feeding
           for (const v of viruses) {
             if (dist(f, v) < v.r + f.r) {
