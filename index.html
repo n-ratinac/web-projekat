@@ -600,7 +600,7 @@
 
       // ─── CAMERA ───────────────────────────────────────────────────────────────────
       function getCamera() {
-        if (!player) return { x: WORLD / 2, y: WORLD / 2, zoom: 1 };
+        if (!player || player.dead || player.totalMass <= 0) return { x: WORLD / 2, y: WORLD / 2, zoom: 1 };
         const cx = player.cx,
           cy = player.cy;
         const m = player.totalMass;
@@ -1050,6 +1050,7 @@
         checkPlayerEating();
         checkBotEating();
         respawnBots();
+        maybeSpawnBot();
         updateUI();
 
         render();
@@ -1067,11 +1068,28 @@
 
         for (const f of food) drawFood(f, cam);
         for (const v of viruses) drawVirus(v, cam);
+
+        // Collect all cells with their alpha
+        const allCells = [];
         for (const b of bots) {
-          if (!b.dead) for (const c of b.cells) drawCell(c, cam);
+          if (!b.dead) {
+            for (const c of b.cells) {
+              allCells.push({ cell: c, alpha: 1 });
+            }
+          }
         }
         if (player && !player.dead) {
-          for (const c of player.cells) drawCell(c, cam, 0.95);
+          for (const c of player.cells) {
+            allCells.push({ cell: c, alpha: 0.95 });
+          }
+        }
+
+        // Sort by mass ascending (smaller first, so larger on top)
+        allCells.sort((a, b) => a.cell.mass - b.cell.mass);
+
+        // Draw sorted cells
+        for (const { cell, alpha } of allCells) {
+          drawCell(cell, cam, alpha);
         }
       }
 
