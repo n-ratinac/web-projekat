@@ -341,8 +341,8 @@
             ny = dy / d;
           this.vx += nx * sp * 0.5;
           this.vy += ny * sp * 0.5;
-          this.vx *= 0.85;
-          this.vy *= 0.85;
+          this.vx *= 0.95;
+          this.vy *= 0.95;
           const maxSp = this.speed * 2;
           const spd = Math.hypot(this.vx, this.vy);
           if (spd > maxSp) {
@@ -691,7 +691,7 @@
           if (c.name) ctx.fillText(c.name, sx, sy - fontSize * 0.3);
           if (sr > 24) {
             ctx.font = `${clamp(sr * 0.3, 8, 22)}px Segoe UI`;
-            ctx.fillText(Math.floor(c.mass), sx, sy + fontSize * 0.45);
+           // ctx.fillText(Math.floor(c.mass), sx, sy + fontSize * 0.45);
           }
           ctx.shadowBlur = 0;
         }
