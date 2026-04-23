@@ -2,11 +2,11 @@
 
 | Tim A     | Tim B    |
 | --------- | -------- |
-| Čučković  | Vasilije |
-| Pavle     | Milan    |
-| Perkov    | Nedović  |
-| Luka      | Tvrdišić |
-| Ćupurdija | Dušan    |
+| Mina      | Pavle    |
+| Todor     | Aritonovic|
+| Varagic   | Zarije   |
+| Lajzer    | Velickovic |
+| Ilic      | Andjela    |
 
 ## Podešavanje projekta
 
