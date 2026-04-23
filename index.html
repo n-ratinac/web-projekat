@@ -918,6 +918,10 @@
               ) {
                 pred.mass += prey.mass;
                 player.cells.splice(i, 1);
+                if (player.cells.length === 0) {
+                  playerDead(prey.mass);
+                  return;
+                }
                 break;
               }
             }
@@ -1000,10 +1004,12 @@
           .join("");
       }
 
-      function playerDead() {
+      function playerDead(finalMass = null) {
         player.dead = true;
         running = false;
-        const mass = Math.floor(player ? player.totalMass : 0);
+        const mass = Math.floor(
+          finalMass !== null ? finalMass : player ? player.totalMass : 0,
+        );
         document.getElementById("final-score").textContent = mass;
         document.getElementById("dead-overlay").style.display = "flex";
       }
