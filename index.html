@@ -496,6 +496,37 @@
         }
       }
 
+      function handlePlayerCellCollisions(cells) {
+        // Prevent blobs from crossing each other when mergeTimer > 0
+        for (let i = 0; i < cells.length; i++) {
+          for (let j = i + 1; j < cells.length; j++) {
+            const a = cells[i],
+              b = cells[j];
+            const d = dist(a, b);
+            const minDist = a.r + b.r;
+
+            // If either cell is in merge cooldown, push them apart
+            if (a.mergeTimer > 0 || b.mergeTimer > 0) {
+              if (d < minDist) {
+                // Push them apart so they only touch at borders
+                const overlap = minDist - d;
+                const dx = (b.x - a.x) || 1;
+                const dy = (b.y - a.y) || 1;
+                const len = Math.hypot(dx, dy);
+                const nx = dx / len;
+                const ny = dy / len;
+                const pushDist = overlap / 2 + 0.1;
+
+                a.x -= nx * pushDist;
+                a.y -= ny * pushDist;
+                b.x += nx * pushDist;
+                b.y += ny * pushDist;
+              }
+            }
+          }
+        }
+      }
+
       function spawnFood(n) {
         for (let i = 0; i < n; i++) food.push(new Food());
       }
@@ -544,6 +575,8 @@
           for (const c of this.cells) {
             c.update(wMouseX, wMouseY, dt);
           }
+          // Handle collisions between own cells to prevent overlap
+          handlePlayerCellCollisions(this.cells);
           if (this.cells.length > 1) {
             mergeCells(this.cells);
           }
@@ -563,7 +596,21 @@
             const d = Math.hypot(dx, dy) || 1;
             const half = c.mass / 2;
             c.mass = half;
-            const child = new PlayerCell(c.x, c.y, half, c.hue, c.name);
+            
+            // Position child blob slightly away from parent in direction of cursor
+            const childR = massToR(half);
+            const parentR = massToR(half);
+            const separationDist = (childR + parentR) * 0.55;
+            const nx = dx / d;
+            const ny = dy / d;
+            
+            const child = new PlayerCell(
+              c.x + nx * separationDist,
+              c.y + ny * separationDist,
+              half,
+              c.hue,
+              c.name
+            );
             child.vx = (dx / d) * child.speed * 12;
             child.vy = (dy / d) * child.speed * 12;
             child.mergeTimer = MERGE_TIME;
