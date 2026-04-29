@@ -1,5 +1,6 @@
 import asyncio
 import random
+import time
 import socketio
 from aiohttp import web
 from enigine import Engine
@@ -53,11 +54,20 @@ async def disconnect(sid):
 
 
 async def game_loop():
+    TICK_RATE = 0.05  # seconds between ticks (20 ticks/sec)
+    last_time = time.monotonic()
+
     while True:
-        # Move every player according to their latest input
+        await asyncio.sleep(TICK_RATE)
+
+        now = time.monotonic()
+        dt = now - last_time  # actual elapsed seconds (handles jitter)
+        last_time = now
+
+        # Move every player with delta time so speed is tick-rate independent
         for sid, player in list(players.items()):
             direction = inputs.get(sid, (0, 0))
-            engine.move_player(player, direction)
+            engine.move_player(player, direction, dt)
 
         # Broadcast the authoritative world state to all clients
         state = [
@@ -65,9 +75,6 @@ async def game_loop():
             for p in players.values()
         ]
         await sio.emit("state", state)
-
-        # 20 ticks per second
-        await asyncio.sleep(0.03)
 
 
 async def start_game_loop(app):

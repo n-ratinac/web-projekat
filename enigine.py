@@ -11,5 +11,5 @@ class Engine:
         if player in self.players:
             self.players.remove(player)
 
-    def move_player(self, player, direction):
-        player.move(direction)
+    def move_player(self, player, direction, dt):
+        player.move(direction, dt)

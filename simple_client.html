@@ -20,13 +20,33 @@
         left: 20px;
         z-index: 10;
       }
+      #server-info {
+        position: absolute;
+        top: 20px;
+        left: 110px;
+        z-index: 10;
+        color: #aaa;
+        font: 13px sans-serif;
+        line-height: 28px;
+      }
     </style>
   </head>
   <body>
     <button id="connectBtn">Connect</button>
+    <span id="server-info"></span>
     <canvas id="gameCanvas" width="800" height="600"></canvas>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
+      // ─── SERVER URL ──────────────────────────────────────────────────────────────
+      // Override the server at runtime without editing this file:
+      //   open simple_client.html?server=http://localhost:8080
+      // Falls back to the office IP if no query param is given.
+      const DEFAULT_SERVER = "http://10.0.4.101:8080";
+      const params = new URLSearchParams(window.location.search);
+      const SERVER_URL = params.get("server") || DEFAULT_SERVER;
+      document.getElementById("server-info").textContent = "→ " + SERVER_URL;
+      // ─────────────────────────────────────────────────────────────────────────────
+
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const connectBtn = document.getElementById("connectBtn");
@@ -40,7 +60,7 @@
 
       connectBtn.onclick = () => {
         if (connected) return;
-        socket = io("http://10.0.4.101:8080");
+        socket = io(SERVER_URL);
         socket.on("connect", () => {
           socket.emit("join", { name: playerName });
           connected = true;
