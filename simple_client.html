@@ -38,10 +38,7 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
       // ─── SERVER URL ──────────────────────────────────────────────────────────────
-      // Override the server at runtime without editing this file:
-      //   open simple_client.html?server=http://localhost:8080
-      // Falls back to the office IP if no query param is given.
-      const DEFAULT_SERVER = "http://10.0.4.101:8080";
+      const DEFAULT_SERVER = "http://localhost:8080"; 
       const params = new URLSearchParams(window.location.search);
       const SERVER_URL = params.get("server") || DEFAULT_SERVER;
       document.getElementById("server-info").textContent = "→ " + SERVER_URL;
@@ -50,30 +47,38 @@
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const connectBtn = document.getElementById("connectBtn");
+      
       let socket = null;
       let playerName = "Player" + Math.floor(Math.random() * 1000);
       let player = { x: 400, y: 300, name: playerName };
-      let world = [];
-      let mouse = { x: 400, y: 300 };
+      let world = [];      // Inicijalizovano kao prazan niz[cite: 6]
+      let foodItems = [];  // Inicijalizovano kao prazan niz[cite: 6]
       let connected = false;
+      let mouse = { x: 400, y: 300 };
       let lastDirection = { dx: 0, dy: 0 };
 
       connectBtn.onclick = () => {
         if (connected) return;
         socket = io(SERVER_URL);
+        
         socket.on("connect", () => {
           socket.emit("join", { name: playerName });
           connected = true;
           connectBtn.style.display = "none";
         });
+
         socket.on("state", (state) => {
-          world = state;
-          // Find our player in the authoritative state and sync position
-          const me = world.find((p) => p.name === playerName);
-          if (me) {
-            player.x = me.x;
-            player.y = me.y;
-          }
+            // Ako state.players ne postoji, stavi prazan niz da 'find' ne baci grešku[cite: 6]
+            world = state.players || []; 
+            foodItems = state.food || []; 
+            
+            if (world.length > 0) {
+                const me = world.find((p) => p.name === playerName);
+                if (me) {
+                    player.x = me.x;
+                    player.y = me.y;
+                }
+            }
         });
       };
 
@@ -96,6 +101,16 @@
 
       function render() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Prvo crtamo hranu
+        for (const f of foodItems) {
+          ctx.beginPath();
+          ctx.arc(f.x, f.y, 5, 0, 2 * Math.PI); 
+          ctx.fillStyle = "#ff0"; // Žuta hrana
+          ctx.fill();
+        }
+
+        // Zatim crtamo igrače
         for (const p of world) {
           ctx.beginPath();
           ctx.arc(p.x, p.y, 20, 0, 2 * Math.PI);
@@ -103,6 +118,8 @@
           ctx.fill();
           ctx.strokeStyle = "#fff";
           ctx.stroke();
+          
+          // Ime igrača
           ctx.fillStyle = "#fff";
           ctx.font = "14px sans-serif";
           ctx.textAlign = "center";
@@ -115,6 +132,7 @@
         render();
         requestAnimationFrame(gameLoop);
       }
+      
       gameLoop();
     </script>
   </body>

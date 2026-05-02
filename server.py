@@ -15,7 +15,7 @@ players = {}
 # sid -> (dx, dy)
 inputs = {}
 
-engine = Engine(800, 600)
+engine = Engine(1800, 1800)
 
 
 @sio.event
@@ -54,26 +54,30 @@ async def disconnect(sid):
 
 
 async def game_loop():
-    TICK_RATE = 0.05  # seconds between ticks (20 ticks/sec)
+    TICK_RATE = 0.05  
     last_time = time.monotonic()
 
     while True:
         await asyncio.sleep(TICK_RATE)
 
         now = time.monotonic()
-        dt = now - last_time  # actual elapsed seconds (handles jitter)
+        dt = now - last_time  
         last_time = now
 
-        # Move every player with delta time so speed is tick-rate independent
         for sid, player in list(players.items()):
             direction = inputs.get(sid, (0, 0))
             engine.move_player(player, direction, dt)
+        engine.spawn_food(max_food=150)
 
         # Broadcast the authoritative world state to all clients
-        state = [
-            {"name": p.name, "x": p.x, "y": p.y}
-            for p in players.values()
-        ]
+        state = {
+            "players": [
+                {"name": p.name, "x": p.x, "y": p.y}
+                for p in players.values()
+            ],
+            "food": engine.food 
+        }
+
         await sio.emit("state", state)
 
 
