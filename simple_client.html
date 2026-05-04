@@ -108,44 +108,73 @@
         mouse.y = e.clientY - rect.top;
       });
 
-      function sendDirection() {
-        if (!socket || !connected) return;
-        const dx = mouse.x - player.x;
-        const dy = mouse.y - player.y;
-        const len = Math.sqrt(dx * dx + dy * dy);
-        if (len > 5) {
-          lastDirection = { dx: dx / len, dy: dy / len };
-        }
-        socket.emit("update_input", lastDirection);
-      }
+function sendDirection() {
+  if (!socket || !connected) return;
 
-      function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Pošto je igrač uvek u centru ekrana, smer je razlika 
+  // između pozicije miša i centra canvasa.
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
 
-        // Prvo crtamo hranu
-        for (const f of foodItems) {
-          ctx.beginPath();
-          ctx.arc(f.x, f.y, 5, 0, 2 * Math.PI); 
-          ctx.fillStyle = "#ff0"; // Žuta hrana
-          ctx.fill();
-        }
+  const dx = mouse.x - centerX;
+  const dy = mouse.y - centerY;
 
-        // Zatim crtamo igrače
-        for (const p of world) {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, 20, 0, 2 * Math.PI);
-          ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
-          ctx.fill();
-          ctx.strokeStyle = "#fff";
-          ctx.stroke();
-          
-          // Ime igrača
-          ctx.fillStyle = "#fff";
-          ctx.font = "14px sans-serif";
-          ctx.textAlign = "center";
-          ctx.fillText(p.name, p.x, p.y - 25);
-        }
-      }
+  const len = Math.sqrt(dx * dx + dy * dy);
+  
+  // Ako je miš dovoljno daleko od centra, pošalji smer
+  if (len > 10) {
+    lastDirection = { dx: dx / len, dy: dy / len };
+    socket.emit("update_input", lastDirection);
+  }
+}
+
+    let zoom = 1;
+
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Nađi trenutnog igrača da odrediš centar kamere i nivo zuma
+    const me = world.find((p) => p.name === playerName);
+    if (me) {
+        // Logika za zum: što je veća masa, manji je zoom faktor (vidimo šire)
+        // Formula: 1 / sqrt(masa / početna_masa)
+        zoom = Math.pow(20 / me.mass, 0.4); 
+
+        ctx.save();
+        // Centriraj kameru na igrača
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.scale(zoom, zoom);
+        ctx.translate(-me.x, -me.y);
+    }
+
+    // Crtanje hrane
+    for (const f of foodItems) {
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, 5, 0, 2 * Math.PI); 
+        ctx.fillStyle = "#ff0";
+        ctx.fill();
+    }
+
+    // Crtanje igrača
+    for (const p of world) {
+        let radius = Math.sqrt(p.mass) * 4; // Radijus zavisi od mase
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Ime igrača
+        ctx.fillStyle = "#fff";
+        ctx.font = `${14 / zoom}px sans-serif`; // Skaliraj font da ne bude ogroman
+        ctx.textAlign = "center";
+        ctx.fillText(p.name, p.x, p.y - radius - 5);
+    }
+
+    if (me) ctx.restore();
+}
 
       function gameLoop() {
         if (connected) sendDirection();

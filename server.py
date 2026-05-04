@@ -3,7 +3,7 @@ import random
 import time
 import socketio
 from aiohttp import web
-from enigine import Engine
+from enigine import Engine # Proveri da li je fajl engine.py ili enigine.py
 from player import Player
 
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
@@ -17,16 +17,13 @@ inputs = {}
 
 engine = Engine(1800, 1800)
 
-
 @sio.event
 async def connect(sid, environ):
     print(f"Client connected: {sid}")
 
-
 @sio.event
 async def join(sid, data):
     name = data.get("name", "Player")
-    # Spawn at a random position so players don't overlap
     x = random.randint(100, 700)
     y = random.randint(100, 500)
     player = Player(name, x, y)
@@ -35,14 +32,12 @@ async def join(sid, data):
     inputs[sid] = (0, 0)
     print(f"[join] {name} at ({x}, {y})")
 
-
 @sio.event
 async def update_input(sid, data):
     if sid in players:
         dx = float(data.get("dx", 0))
         dy = float(data.get("dy", 0))
         inputs[sid] = (dx, dy)
-
 
 @sio.event
 async def disconnect(sid):
@@ -51,7 +46,6 @@ async def disconnect(sid):
         del players[sid]
         del inputs[sid]
         print(f"Client disconnected: {sid}")
-
 
 async def game_loop():
     TICK_RATE = 0.05  
@@ -69,17 +63,17 @@ async def game_loop():
             engine.move_player(player, direction, dt)
         engine.spawn_food(max_food=150)
 
-        # Broadcast the authoritative world state to all clients
+        # Kreiranje stanja (pazi na mass!)[cite: 3, 6]
         state = {
             "players": [
-                {"name": p.name, "x": p.x, "y": p.y}
+                {"name": p.name, "x": p.x, "y": p.y, "mass": p.mass} 
                 for p in players.values()
             ],
             "food": engine.food 
         }
 
+        # Ova linija mora biti poravnata sa 'state' blokom iznad
         await sio.emit("state", state)
-
 
 async def start_game_loop(app):
     app["game_loop"] = asyncio.ensure_future(game_loop())
