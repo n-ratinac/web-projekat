@@ -23,4 +23,14 @@ class Engine:
             self.players.remove(player)
 
     def move_player(self, player, direction, dt):
+        # Prvo pomeri igrača koristeći njegovu move metodu
         player.move(direction, dt)
+    
+        # Definisanje granica mape (4000x4000)[cite: 13, 15]
+        radius = 20 # Pretpostavljeni radijus igrača
+    
+        # Clamp logika: Drži igrača unutar koordinata[cite: 15]
+        if player.x < radius: player.x = radius
+        if player.y < radius: player.y = radius
+        if player.x > self.x - radius: player.x = self.x - radius
+        if player.y > self.y - radius: player.y = self.y - radius

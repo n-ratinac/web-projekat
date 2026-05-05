@@ -15,7 +15,7 @@ players = {}
 # sid -> (dx, dy)
 inputs = {}
 
-engine = Engine(1800, 1800)
+engine = Engine(4000, 4000)
 
 @sio.event
 async def connect(sid, environ):

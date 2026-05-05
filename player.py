@@ -3,7 +3,7 @@ class Player:
         self.name = name
         self.x = x
         self.y = y
-        self.mass = 20  
+        self.mass = 20
         # speed is now in pixels per second (not pixels per tick)
         self.speed = speed
  
