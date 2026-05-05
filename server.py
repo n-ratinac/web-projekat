@@ -59,7 +59,8 @@ async def game_loop():
         for sid, player in list(players.items()):
             direction = inputs.get(sid, (0, 0))
             engine.move_player(player, direction, dt)
-            engine.eat_food(player)  # check food collision after moving
+            engine.eat_food(player)
+            engine.decay_mass(player, dt)  # mass decay svaki tick
 
         engine.spawn_food(max_food=150)
 
@@ -87,4 +88,3 @@ app.on_cleanup.append(stop_game_loop)
 
 if __name__ == "__main__":
     web.run_app(app, host="0.0.0.0", port=8080)
-    

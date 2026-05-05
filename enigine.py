@@ -19,11 +19,6 @@ class Engine:
             })
 
     def eat_food(self, player):
-        """
-        Checks if the player overlaps any food item.
-        If yes: removes the food and increases player mass based on their current mass.
-        Player radius = sqrt(mass) * 4  (same formula as the client uses)
-        """
         player_radius = math.sqrt(player.mass) * 4
         eaten = []
 
@@ -31,20 +26,28 @@ class Engine:
             dx = player.x - food["x"]
             dy = player.y - food["y"]
             distance = math.sqrt(dx * dx + dy * dy)
-            food_radius = 5  # matches client arc radius
+            food_radius = 5
 
             if distance < player_radius + food_radius:
                 eaten.append(food)
-                
-                # Formula: Vrednost hrane opada kako masa igrača raste.
-                # Sa početnom masom 20, igrač dobija 0.5 mase po hrani.
-                # Sa masom 100, dobija 0.1 mase po hrani.
-                # Donja granica je 0.05 (nikada ne pada ispod toga).
                 mass_gain = 1 + (player.mass * 0.01)
                 player.mass += mass_gain
 
         for food in eaten:
             self.food.remove(food)
+
+    def decay_mass(self, player, dt):
+        """
+        Mass decay: igrač gubi masu tokom vremena.
+        Decay počinje tek kada masa pređe MIN_MASS (20).
+        Gubi 1% mase po sekundi, ali nikada ne pada ispod 20.
+        """
+        MIN_MASS = 20
+        DECAY_RATE = 0.01  # 1% mase po sekundi
+
+        if player.mass > MIN_MASS:
+            loss = player.mass * DECAY_RATE * dt
+            player.mass = max(MIN_MASS, player.mass - loss)
 
     def add_player(self, player):
         self.players.append(player)
@@ -56,7 +59,6 @@ class Engine:
     def move_player(self, player, direction, dt):
         player.move(direction, dt)
 
-        # Clamp player inside map bounds using actual radius
         player_radius = math.sqrt(player.mass) * 4
         if player.x < player_radius: player.x = player_radius
         if player.y < player_radius: player.y = player_radius
