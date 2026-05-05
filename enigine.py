@@ -21,7 +21,7 @@ class Engine:
     def eat_food(self, player):
         """
         Checks if the player overlaps any food item.
-        If yes: removes the food and increases player mass.
+        If yes: removes the food and increases player mass based on their current mass.
         Player radius = sqrt(mass) * 4  (same formula as the client uses)
         """
         player_radius = math.sqrt(player.mass) * 4
@@ -35,7 +35,13 @@ class Engine:
 
             if distance < player_radius + food_radius:
                 eaten.append(food)
-                player.mass += 1  # each food pellet gives +1 mass
+                
+                # Formula: Vrednost hrane opada kako masa igrača raste.
+                # Sa početnom masom 20, igrač dobija 0.5 mase po hrani.
+                # Sa masom 100, dobija 0.1 mase po hrani.
+                # Donja granica je 0.05 (nikada ne pada ispod toga).
+                mass_gain = 1 + (player.mass * 0.01)
+                player.mass += mass_gain
 
         for food in eaten:
             self.food.remove(food)
@@ -56,4 +62,3 @@ class Engine:
         if player.y < player_radius: player.y = player_radius
         if player.x > self.x - player_radius: player.x = self.x - player_radius
         if player.y > self.y - player_radius: player.y = self.y - player_radius
-        

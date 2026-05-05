@@ -15,23 +15,32 @@
         margin: 0 auto;
       }
       #ui-container {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 10;
-      display: flex;
-      flex-direction: column; 
-      gap: 10px;              
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column; 
+        gap: 10px;              
       }
-
-
       #connectBtn { 
-      width: fit-content; 
+        width: fit-content; 
       }
-
       #server-info { 
-      color: #aaa; 
-      font: 13px sans-serif; 
+        color: #aaa; 
+        font: 13px sans-serif; 
+      }
+      /* Stil za fiksni skor u gornjem desnom uglu */
+      #score-hud {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 10;
+        color: #fff;
+        font: bold 24px Arial, sans-serif;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+        pointer-events: none;
+        display: none; /* Prikazuje se tek kada se igrač poveže */
       }
     </style>
   </head>
@@ -46,7 +55,8 @@
       <span id="server-info" style="color: #aaa; font: 13px sans-serif;"></span>
     
     </div>
-    
+
+    <div id="score-hud">Score: 20</div>
     
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
@@ -63,12 +73,13 @@
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const connectBtn = document.getElementById("connectBtn");
+      const scoreHud = document.getElementById("score-hud");
       
       let socket = null;
       let playerName = ""; // --------------------------------------------------------
       let player = { x: 400, y: 300, name: "" }; // ----------------------------------
-      let world = [];      // Inicijalizovano kao prazan niz[cite: 6]
-      let foodItems = [];  // Inicijalizovano kao prazan niz[cite: 6]
+      let world = [];      // Inicijalizovano kao prazan niz
+      let foodItems = [];  // Inicijalizovano kao prazan niz
       let connected = false;
       let mouse = { x: 400, y: 300 };
       let lastDirection = { dx: 0, dy: 0 };
@@ -85,10 +96,11 @@
           socket.emit("join", { name: playerName });
           connected = true;
           uiContainer.style.display = "none"; // -------------------------------------
+          scoreHud.style.display = "block";   // Prikazujemo fiksni skor
         });
 
         socket.on("state", (state) => {
-            // Ako state.players ne postoji, stavi prazan niz da 'find' ne baci grešku[cite: 6]
+            // Ako state.players ne postoji, stavi prazan niz da 'find' ne baci grešku
             world = state.players || []; 
             foodItems = state.food || []; 
             
@@ -97,6 +109,8 @@
                 if (me) {
                     player.x = me.x;
                     player.y = me.y;
+                    // Ažuriramo HUD skor u uglu ekrana
+                    scoreHud.textContent = "Score: " + Math.round(me.mass || 20);
                 }
             }
         });
@@ -108,93 +122,99 @@
         mouse.y = e.clientY - rect.top;
       });
 
-function sendDirection() {
-  if (!socket || !connected) return;
+      function sendDirection() {
+        if (!socket || !connected) return;
 
-  // Pošto je igrač uvek u centru ekrana, smer je razlika 
-  // između pozicije miša i centra canvasa.
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
+        // Pošto je igrač uvek u centru ekrana, smer je razlika 
+        // između pozicije miša i centra canvasa.
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
 
-  const dx = mouse.x - centerX;
-  const dy = mouse.y - centerY;
+        const dx = mouse.x - centerX;
+        const dy = mouse.y - centerY;
 
-  const len = Math.sqrt(dx * dx + dy * dy);
-  
-  // Ako je miš dovoljno daleko od centra, pošalji smer
-  if (len > 10) {
-    lastDirection = { dx: dx / len, dy: dy / len };
-    socket.emit("update_input", lastDirection);
-  }
-}
-
-    let zoom = 1;
-
-    function render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // 1. Pronađi tebe da bi odredili centar i zum
-    const me = world.find((p) => p.name === playerName);
-    
-    // Inicijalizujemo zum na 1 (normalno) u slučaju da 'me' još nije učitan
-    let zoom = 1.0; 
-
-    ctx.save();
-
-    if (me) {
-        // DINAMIČKI ZUM: što je veća masa, manji je zoom (vidi se šire)
-       
-        zoom = Math.pow(20 / (me.mass || 20), 0.4); 
-
-        // KAMERA: Centriranje i primena zuma
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.scale(zoom, zoom);
-        ctx.translate(-me.x, -me.y);
-    }
-
-    // 2. ISCRTAVANJE GRANICA MAPE[cite: 14]
-    ctx.strokeStyle = "#ff0000"; 
-    ctx.lineWidth = 10;
-    ctx.strokeRect(0, 0, 4000, 4000); // Granice 4000x4000[cite: 13, 14]
-    
-    ctx.fillStyle = "#1a1a1a";
-    ctx.fillRect(0, 0, 4000, 4000);
-
-    // 3. CRTANJE HRANE[cite: 14]
-    for (const f of foodItems) {
-        ctx.beginPath();
-        ctx.arc(f.x, f.y, 5, 0, 2 * Math.PI); 
-        ctx.fillStyle = "#ff0";
-        ctx.fill();
-        ctx.closePath();
-    }
-
-    // 4. CRTANJE IGRAČA[cite: 14]
-    for (const p of world) {
-       
-        let radius = Math.sqrt(p.mass || 20) * 4; 
+        const len = Math.sqrt(dx * dx + dy * dy);
         
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
-        ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
-        ctx.fill();
-        
-        // TANKA BELA LINIJA (Popravljeno da ne bude debela)[cite: 14]
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)"; 
-        ctx.lineWidth = 2; 
-        ctx.stroke();
-        ctx.closePath();
-        
-        // IME IGRAČA (Skalirano sa zumom)[cite: 14]
-        ctx.fillStyle = "#fff";
-        // Delimo font sa zoom-om da ostane čitljiv dok rasteš[cite: 14]
-        ctx.font = `${14 / zoom}px sans-serif`; 
-        ctx.textAlign = "center";
-        ctx.fillText(p.name, p.x, p.y - radius - (5 / zoom));
-    }
+        // Ako je miš dovoljno daleko od centra, pošalji smer
+        if (len > 10) {
+          lastDirection = { dx: dx / len, dy: dy / len };
+          socket.emit("update_input", lastDirection);
+        }
+      }
 
-    ctx.restore();
-}
+      let zoom = 1;
+
+      function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Pronađi tebe da bi odredili centar i zum
+        const me = world.find((p) => p.name === playerName);
+        
+        // Inicijalizujemo zum na 1 (normalno) u slučaju da 'me' još nije učitan
+        let zoom = 1.0; 
+
+        ctx.save();
+
+        if (me) {
+            // DINAMIČKI ZUM: što je veća masa, manji je zoom (vidi se šire)
+            zoom = Math.pow(20 / (me.mass || 20), 0.4); 
+
+            // KAMERA: Centriranje i primena zuma
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(zoom, zoom);
+            ctx.translate(-me.x, -me.y);
+        }
+
+        // 2. ISCRTAVANJE GRANICA MAPE
+        ctx.strokeStyle = "#ff0000"; 
+        ctx.lineWidth = 10;
+        ctx.strokeRect(0, 0, 4000, 4000); // Granice 4000x4000
+        
+        ctx.fillStyle = "#1a1a1a";
+        ctx.fillRect(0, 0, 4000, 4000);
+
+        // 3. CRTANJE HRANE
+        for (const f of foodItems) {
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, 5, 0, 2 * Math.PI); 
+            ctx.fillStyle = "#ff0";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // 4. CRTANJE IGRAČA
+        for (const p of world) {
+            let radius = Math.sqrt(p.mass || 20) * 4; 
+            
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
+            ctx.fill();
+            
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+
+            // --- CRTANJE IMENA IGRAČA NA CENTRU KRUGA ---
+            // Skaliramo veličinu fonta srazmerno krugu da uvek izgleda proporcionalno
+            let fontSize = Math.max(12, Math.round(radius * 0.28));
+            ctx.font = `bold ${fontSize}px Arial`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            // Crni obris oko belog teksta za vrhunsku čitljivost
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = Math.max(2, fontSize * 0.15);
+            ctx.fillStyle = "#ffffff";
+
+            ctx.strokeText(p.name, p.x, p.y);
+            ctx.fillText(p.name, p.x, p.y);
+        }
+
+        ctx.restore();
+      }
+
       function gameLoop() {
         if (connected) sendDirection();
         render();
