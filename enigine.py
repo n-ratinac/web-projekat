@@ -37,13 +37,9 @@ class Engine:
             self.food.remove(food)
 
     def decay_mass(self, player, dt):
-        """
-        Mass decay: igrač gubi masu tokom vremena.
-        Decay počinje tek kada masa pređe MIN_MASS (20).
-        Gubi 1% mase po sekundi, ali nikada ne pada ispod 20.
-        """
+
         MIN_MASS = 20
-        DECAY_RATE = 0.01  # 1% mase po sekundi
+        DECAY_RATE = 0.01
 
         if player.mass > MIN_MASS:
             loss = player.mass * DECAY_RATE * dt
