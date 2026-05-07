@@ -244,15 +244,15 @@
 const WS_URL     = "ws://localhost:8765";
 const WORLD_W    = 2000;
 const WORLD_H    = 2000;
-const CELL_R     = 22;      // radius ćelije
+const CELL_R     = 22;
 const GRID_STEP  = 80;
+const SPEED      = 3.5;          // piksela po framu (max)
+const SEND_HZ    = 20;           // koliko puta u sekundi šaljemo poziciju serveru
+const LERP_OTHER = 0.18;         // brzina interpolacije tuđih igrača
 
 // ─── State ───────────────────────────────────────────────
 let ws, selfState = null;
-const others = new Map();   // id → playerState
-
-// ─── Camera ──────────────────────────────────────────────
-let cam = { x: WORLD_W/2, y: WORLD_H/2, zoom: 1 };
+const others = new Map();        // id → { ...serverState, renderX, renderY }
 
 // ─── Canvas setup ────────────────────────────────────────
 const canvas = document.getElementById("canvas");
@@ -266,17 +266,70 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 
-// ─── Smooth camera lerp ──────────────────────────────────
+// ─── Mouse tracking ──────────────────────────────────────
+let mouseX = null, mouseY = null;
+
+canvas.addEventListener("mousemove", e => {
+  const r = canvas.getBoundingClientRect();
+  mouseX = e.clientX - r.left;
+  mouseY = e.clientY - r.top;
+});
+canvas.addEventListener("mouseleave", () => { mouseX = null; mouseY = null; });
+
+// ─── Camera ──────────────────────────────────────────────
+let cam = { x: WORLD_W/2, y: WORLD_H/2, zoom: 1 };
 let targetCam = { x: WORLD_W/2, y: WORLD_H/2, zoom: 1 };
 
-function updateCamera() {
-  if (!selfState) return;
+// ─── Movement & send loop ────────────────────────────────
+let lastSendTime = 0;
+
+function tickMovement(now) {
+  if (!selfState || mouseX === null) return;
+
+  const W = canvas.width, H = canvas.height;
+
+  // Pretvori poziciju miša u world koordinate
+  const worldMouseX = (mouseX - W/2) / cam.zoom + cam.x;
+  const worldMouseY = (mouseY - H/2) / cam.zoom + cam.y;
+
+  const dx = worldMouseX - selfState.x;
+  const dy = worldMouseY - selfState.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+
+  let vx = 0, vy = 0;
+  if (dist > CELL_R * 0.5) {
+    const speed = Math.min(SPEED, dist * 0.12);
+    vx = (dx / dist) * speed;
+    vy = (dy / dist) * speed;
+    selfState.x = Math.max(0, Math.min(WORLD_W, selfState.x + vx));
+    selfState.y = Math.max(0, Math.min(WORLD_H, selfState.y + vy));
+  }
+
+  // Kamera prati igrača
   targetCam.x = selfState.x;
   targetCam.y = selfState.y;
+
+  // Throttled slanje serveru
+  if (ws && ws.readyState === WebSocket.OPEN && now - lastSendTime > 1000 / SEND_HZ) {
+    ws.send(JSON.stringify({ type: "move", x: selfState.x, y: selfState.y, vx, vy }));
+    lastSendTime = now;
+  }
+}
+
+// ─── Interpolacija tuđih igrača ──────────────────────────
+function tickOthers() {
+  others.forEach(p => {
+    if (p.renderX === undefined) { p.renderX = p.x; p.renderY = p.y; }
+    p.renderX += (p.x - p.renderX) * LERP_OTHER;
+    p.renderY += (p.y - p.renderY) * LERP_OTHER;
+  });
 }
 
 // ─── Draw ────────────────────────────────────────────────
-function draw() {
+function draw(now) {
+  tickMovement(now);
+  tickOthers();
+
   // Lerp camera
   cam.x    += (targetCam.x    - cam.x)    * 0.08;
   cam.y    += (targetCam.y    - cam.y)    * 0.08;
@@ -286,7 +339,6 @@ function draw() {
   ctx.clearRect(0, 0, W, H);
 
   ctx.save();
-  // Centar ekrana → centar kamere
   ctx.translate(W/2 - cam.x * cam.zoom, H/2 - cam.y * cam.zoom);
   ctx.scale(cam.zoom, cam.zoom);
 
@@ -310,11 +362,14 @@ function draw() {
   ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
 
   // ── Draw all players ──
-  const allPlayers = [];
-  if (selfState) allPlayers.push({ ...selfState, isSelf: true });
-  others.forEach(p => allPlayers.push({ ...p, isSelf: false }));
-
-  allPlayers.forEach(p => drawCell(p));
+  // Tuđi igrači crtaju se na renderX/renderY (interpolovano)
+  others.forEach(p => drawCell({
+    ...p,
+    x: p.renderX ?? p.x,
+    y: p.renderY ?? p.y,
+    isSelf: false,
+  }));
+  if (selfState) drawCell({ ...selfState, isSelf: true });
 
   ctx.restore();
 
