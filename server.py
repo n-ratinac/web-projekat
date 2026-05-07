@@ -6,100 +6,97 @@ import string
 
 WORLD_WIDTH = 2000
 WORLD_HEIGHT = 2000
+FOOD_COUNT = 150
+PLAYER_START_RADIUS = 22
 
-players = {}  # { websocket: { id, x, y, name, color } }
+players = {}  # { websocket: { id, x, y, name, color, radius } }
+food = []
 
-COLORS = [
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4",
-    "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F",
-    "#BB8FCE", "#85C1E9", "#82E0AA", "#F1948A",
-]
+COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9", "#82E0AA", "#F1948A"]
 
 def generate_id(length=6):
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
+def generate_food_item():
+    return {
+        "id": generate_id(8),
+        "x": random.randint(15, WORLD_WIDTH - 15),
+        "y": random.randint(15, WORLD_HEIGHT - 15),
+        "color": random.choice(COLORS)
+    }
+
+for _ in range(FOOD_COUNT):
+    food.append(generate_food_item())
+
 def random_player_state(name="Igrač"):
     return {
         "id": generate_id(),
-        "x": random.randint(50, WORLD_WIDTH - 50),
-        "y": random.randint(50, WORLD_HEIGHT - 50),
+        "x": random.randint(100, WORLD_WIDTH - 100),
+        "y": random.randint(100, WORLD_HEIGHT - 100),
         "name": name,
         "color": random.choice(COLORS),
+        "radius": PLAYER_START_RADIUS
     }
 
 async def broadcast(message: dict, exclude=None):
-    """Pošalji poruku svim konektovanim igračima osim exclude."""
     data = json.dumps(message)
     targets = [ws for ws in players if ws != exclude]
     if targets:
         await asyncio.gather(*[ws.send(data) for ws in targets], return_exceptions=True)
 
 async def handler(websocket):
-    # Novi igrač se konektovao
     state = random_player_state()
     players[websocket] = state
+    print(f"[+] Igrač {state['name']} povezan")
 
-    print(f"[+] Igrač {state['name']} ({state['id']}) konektovan na ({state['x']}, {state['y']})")
-
-    # Pošalji novom igraču njegovo stanje + listu svih postojećih igrača
     await websocket.send(json.dumps({
         "type": "init",
         "self": state,
         "players": [s for ws, s in players.items() if ws != websocket],
+        "food": food 
     }))
 
-    # Obavesti ostale igrače o novom igraču
-    await broadcast({
-        "type": "player_joined",
-        "player": state,
-    }, exclude=websocket)
+    await broadcast({"type": "player_joined", "player": state}, exclude=websocket)
 
     try:
         async for raw in websocket:
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
+            msg = json.loads(raw)
+            if msg.get("type") == "move":
+                p = players[websocket]
+                p["x"], p["y"] = msg.get("x", p["x"]), msg.get("y", p["y"])
+                
+                # Provera hrane i rasta
+                for item in food[:]:
+                    dist = ((p["x"] - item["x"])**2 + (p["y"] - item["y"])**2)**0.5
+                    if dist < p["radius"]:
+                        food.remove(item)
+                        p["radius"] += 0.6 # Rast
+                        new_item = generate_food_item()
+                        food.append(new_item)
+                        await broadcast({
+                            "type": "food_update",
+                            "eaten": item["id"],
+                            "new_item": new_item,
+                            "eater": p["id"],
+                            "new_radius": p["radius"]
+                        })
 
-            msg_type = msg.get("type")
-
-            # Klijent želi da promeni ime
-            if msg_type == "set_name":
-                new_name = str(msg.get("name", "Igrač"))[:20].strip() or "Igrač"
-                players[websocket]["name"] = new_name
-                await broadcast({
-                    "type": "player_updated",
-                    "player": players[websocket],
-                })
-
-            # Klijent šalje update pozicije (za buduću upotrebu)
-            elif msg_type == "move":
-                players[websocket]["x"] = msg.get("x", players[websocket]["x"])
-                players[websocket]["y"] = msg.get("y", players[websocket]["y"])
                 await broadcast({
                     "type": "player_moved",
-                    "id": players[websocket]["id"],
-                    "x": players[websocket]["x"],
-                    "y": players[websocket]["y"],
+                    "id": p["id"], "x": p["x"], "y": p["y"], "radius": p["radius"]
                 }, exclude=websocket)
 
-    except websockets.exceptions.ConnectionClosed:
-        pass
+            elif msg.get("type") == "set_name":
+                players[websocket]["name"] = str(msg.get("name", "Igrač"))[:15]
+                await broadcast({"type": "player_updated", "player": players[websocket]})
+    except: pass
     finally:
         state = players.pop(websocket, None)
-        if state:
-            print(f"[-] Igrač {state['name']} ({state['id']}) diskonektovan")
-            await broadcast({
-                "type": "player_left",
-                "id": state["id"],
-            })
+        if state: await broadcast({"type": "player_left", "id": state["id"]})
 
 async def main():
-    print("=== Agar.io Server ===")
-    print(f"Svet: {WORLD_WIDTH}x{WORLD_HEIGHT}")
-    print("Slušam na ws://localhost:8765 ...")
     async with websockets.serve(handler, "localhost", 8765):
-        await asyncio.Future()  # radi zauvek
+        await asyncio.Future()
 
 if __name__ == "__main__":
     asyncio.run(main())
