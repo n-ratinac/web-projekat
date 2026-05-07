@@ -967,8 +967,6 @@
             }
           }
         }
-        // keep food count stable
-        while (food.length < FOOD_COUNT) food.push(new Food());
       }
 
       // ─── UI ───────────────────────────────────────────────────────────────────────
@@ -1012,9 +1010,7 @@
 
       function startGame(name) {
         playerName = name || "Player";
-        food = [];
         viruses = [];
-        spawnFood(FOOD_COUNT);
         spawnViruses();
         spawnBots();
         player = new Player(playerName);
@@ -1067,6 +1063,11 @@
         if (player && !player.dead) {
           for (const c of player.cells) drawCell(c, cam, 0.95);
         }
+        // Draw other players
+        for (const sid in otherPlayers) {
+          const p = otherPlayers[sid];
+          drawCell({ x: p.x, y: p.y, mass: p.mass, r: massToR(p.mass), hue: 180, name: p.name }, cam);
+        }
       }
 
       // ─── INPUT ───────────────────────────────────────────────────────────────────
@@ -1098,6 +1099,53 @@
         document.getElementById("dead-overlay").style.display = "none";
         startGame(playerName);
       });
+    </script>
+    <script src="https://cdn.socket.io/3.1.0/socket.io.min.js"></script>
+    <script>
+      // ─── MULTIPLAYER ──────────────────────────────────────────────────────────────
+      const socket = io();
+      let otherPlayers = {};
+      let playerData = null;
+
+      socket.on('player_init', (data) => {
+        playerData = data.player;
+        food = data.food.map(f => ({x: f.x, y: f.y, mass: f.mass, r: massToR(f.mass), hue: f.hue}));
+      });
+
+      socket.on('update', (data) => {
+        otherPlayers = {};
+        for (const sid in data.players) {
+          if (sid !== socket.id) {
+            otherPlayers[sid] = data.players[sid];
+          } else {
+            // Update own mass
+            if (player && player.cells.length > 0) {
+              player.cells[0].mass = data.players[sid].mass;
+            }
+          }
+        }
+        food = data.food.map(f => ({x: f.x, y: f.y, mass: f.mass, r: massToR(f.mass), hue: f.hue}));
+      });
+
+      // Send position updates
+      setInterval(() => {
+        if (player && player.cells.length > 0) {
+          const cell = player.cells[0];
+          socket.emit('move', { x: cell.x, y: cell.y, mass: cell.mass });
+        }
+      }, 50); // 20 times per second
+
+      // Modify startGame to use server position and send name
+      const originalStartGame = startGame;
+      startGame = (name) => {
+        socket.emit('name', name);
+        originalStartGame(name);
+        if (playerData && player) {
+          player.cells[0].x = playerData.x;
+          player.cells[0].y = playerData.y;
+          player.cells[0].mass = playerData.mass;
+        }
+      };
     </script>
   </body>
 </html>
