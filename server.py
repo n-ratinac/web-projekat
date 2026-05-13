@@ -60,10 +60,31 @@ async def game_loop():
             direction = inputs.get(sid, (0, 0))
             engine.move_player(player, direction, dt)
             engine.eat_food(player)
-            engine.decay_mass(player, dt)  # mass decay svaki tick
+            engine.decay_mass(player, dt)  # Mass decay svaki tick
+
+        # ---> Rešavamo jedenje igrača nakon svih pomeranja <---
+        eaten = engine.resolve_player_collisions()
+        
+        for dead_player in eaten:
+            dead_sid = None
+            # Trazimo sid (Socket ID) na osnovu instance igrača
+            for sid, p in players.items():
+                if p == dead_player:
+                    dead_sid = sid
+                    break
+                    
+            if dead_sid:
+                # Emitujemo 'death' event tom klijentu
+                await sio.emit("death", to=dead_sid)
+                
+                # Brišemo ga sa servera i iz rečnika inputa
+                del players[dead_sid]
+                if dead_sid in inputs:
+                    del inputs[dead_sid]
 
         engine.spawn_food(max_food=150)
 
+        # Emitovanje trenutnog stanja klijentima
         state = {
             "players": [
                 {"name": p.name, "x": p.x, "y": p.y, "mass": p.mass}
