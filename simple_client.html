@@ -100,20 +100,22 @@ y <!doctype html>
         });
 
         socket.on("state", (state) => {
-            // Ako state.players ne postoji, stavi prazan niz da 'find' ne baci grešku
-            world = state.players || []; 
-            foodItems = state.food || []; 
+    world = state.players || []; 
+    foodItems = state.food || []; 
+    
+    if (world.length > 0) {
+        const me = world.find((p) => p.name === playerName);
+        if (me && me.cells) {
+            // Izračunaj ukupnu masu za prikaz u HUD-u
+            let totalMass = me.cells.reduce((sum, c) => sum + c.mass, 0);
+            scoreHud.textContent = "Score: " + Math.round(totalMass);
             
-            if (world.length > 0) {
-                const me = world.find((p) => p.name === playerName);
-                if (me) {
-                    player.x = me.x;
-                    player.y = me.y;
-                    // Ažuriramo HUD skor u uglu ekrana
-                    scoreHud.textContent = "Score: " + Math.round(me.mass || 20);
-                }
-            }
-        });
+            // Ažuriraj lokalni player objekat da kamera zna gde da gleda
+            player.x = me.cells[0].x;
+            player.y = me.cells[0].y;
+        }
+    }
+});
       };
 
       canvas.addEventListener("mousemove", (e) => {
@@ -121,7 +123,12 @@ y <!doctype html>
         mouse.x = e.clientX - rect.left;
         mouse.y = e.clientY - rect.top;
       });
-
+      
+      window.addEventListener("keydown", (e) => {
+       if (e.code === "Space" && connected && socket) {
+        socket.emit("split", {}); // Šalje signal serveru da podeli igrača
+         }
+      });
       function sendDirection() {
         if (!socket || !connected) return;
 
@@ -154,16 +161,15 @@ y <!doctype html>
         let zoom = 1.0; 
 
         ctx.save();
+// Umesto me.x i me.y koristi poziciju prve ćelije
+if (me && me.cells && me.cells.length > 0) {
+    let leadCell = me.cells[0]; // Kamera prati prvu ćeliju
+    zoom = Math.pow(20 / (leadCell.mass || 20), 0.4); 
 
-        if (me) {
-            // DINAMIČKI ZUM: što je veća masa, manji je zoom (vidi se šire)
-            zoom = Math.pow(20 / (me.mass || 20), 0.4); 
-
-            // KAMERA: Centriranje i primena zuma
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.scale(zoom, zoom);
-            ctx.translate(-me.x, -me.y);
-        }
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.scale(zoom, zoom);
+    ctx.translate(-leadCell.x, -leadCell.y);
+}
 
         // 2. ISCRTAVANJE GRANICA MAPE
         ctx.strokeStyle = "#ff0000"; 
@@ -182,12 +188,15 @@ y <!doctype html>
             ctx.closePath();
         }
 
-        // 4. CRTANJE IGRAČA
-        for (const p of world) {
-            let radius = Math.sqrt(p.mass || 20) * 4; 
+    // 4. CRTANJE IGRAČA
+for (const p of world) {
+    // Proveri da li igrač uopšte ima ćelije pre nego što kreneš da crtaš
+    if (p.cells && p.cells.length > 0) {
+        for (const cell of p.cells) {
+            let radius = Math.sqrt(cell.mass || 20) * 4; 
             
             ctx.beginPath();
-            ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+            ctx.arc(cell.x, cell.y, radius, 0, 2 * Math.PI);
             ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
             ctx.fill();
             
@@ -196,21 +205,14 @@ y <!doctype html>
             ctx.stroke();
             ctx.closePath();
 
-            // --- CRTANJE IMENA IGRAČA NA CENTRU KRUGA ---
-            // Skaliramo veličinu fonta srazmerno krugu da uvek izgleda proporcionalno
-            let fontSize = Math.max(12, Math.round(radius * 0.28));
-            ctx.font = `bold ${fontSize}px Arial`;
+            // Ime iznad ćelije
+            ctx.font = `bold ${Math.max(10, radius/2)}px Arial`;
             ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-
-            // Crni obris oko belog teksta za vrhunsku čitljivost
-            ctx.strokeStyle = "#000000";
-            ctx.lineWidth = Math.max(2, fontSize * 0.15);
-            ctx.fillStyle = "#ffffff";
-
-            ctx.strokeText(p.name, p.x, p.y);
-            ctx.fillText(p.name, p.x, p.y);
+            ctx.fillStyle = "#fff";
+            ctx.fillText(p.name, cell.x, cell.y);
         }
+    }
+}
 
         ctx.restore();
       }

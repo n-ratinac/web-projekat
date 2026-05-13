@@ -48,7 +48,6 @@ async def disconnect(sid):
 async def game_loop():
     TICK_RATE = 0.05
     last_time = time.monotonic()
-
     while True:
         await asyncio.sleep(TICK_RATE)
 
@@ -61,18 +60,27 @@ async def game_loop():
             engine.move_player(player, direction, dt)
             engine.eat_food(player)
             engine.decay_mass(player, dt)  # mass decay svaki tick
-
+            engine.merge_cells(player)
         engine.spawn_food(max_food=150)
 
         state = {
             "players": [
-                {"name": p.name, "x": p.x, "y": p.y, "mass": p.mass}
+                {
+                    "name": p.name, 
+                    # Šaljemo listu svih ćelija klijentu
+                    "cells": [{"x": c.x, "y": c.y, "mass": c.mass} for c in p.cells]
+                }
                 for p in players.values()
             ],
             "food": engine.food
         }
         await sio.emit("state", state)
-
+@sio.event
+async def split(sid, data):
+    if sid in players:
+        # Poziva metodu split koju si definisao u Player klasi
+        players[sid].split()
+        
 async def start_game_loop(app):
     app["game_loop"] = asyncio.ensure_future(game_loop())
 
