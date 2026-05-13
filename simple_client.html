@@ -40,7 +40,59 @@ y <!doctype html>
         font: bold 24px Arial, sans-serif;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         pointer-events: none;
-        display: none; /* Prikazuje se tek kada se igrač poveže */
+        display: none;
+      }
+      /* Leaderboard panel - fiksiran u gornjem desnom uglu, ispod score-hud-a */
+      #leaderboard {
+        position: absolute;
+        top: 60px;        /* odmah ispod score-hud-a koji je na top: 20px */
+        right: 20px;
+        z-index: 10;
+        background: rgba(0, 0, 0, 0.6);              /* polu-providna crna pozadina */
+        border: 1px solid rgba(255, 255, 255, 0.15); /* suptilna svetla ivica */
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: #fff;
+        font: 14px Arial, sans-serif;
+        min-width: 180px;
+        pointer-events: none; /* klik prolazi kroz panel, ne blokira igru */
+        display: none;        /* sakriven dok se igrač ne poveže */
+      }
+      /* Naslov "LEADERBOARD" u zlatnoj boji */
+      #leaderboard h3 {
+        margin: 0 0 8px 0;
+        font-size: 15px;
+        text-align: center;
+        letter-spacing: 1px;
+        color: #ffd700;
+        text-transform: uppercase;
+      }
+      /* Uklanjamo podrazumevani padding i bullets sa liste */
+      #leaderboard ol {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      /* Svaki red: rank | ime | skor poređani u red s razmakom */
+      #leaderboard li {
+        display: flex;
+        justify-content: space-between;
+        padding: 3px 0;
+        border-bottom: 1px solid rgba(255,255,255,0.07); /* tanka linija između redova */
+        gap: 12px;
+      }
+      #leaderboard li:last-child { border-bottom: none; } /* poslednji red nema liniju ispod */
+      #leaderboard li.me { color: #0f0; font-weight: bold; } /* trenutni igrač je zelen i bold */
+      #leaderboard .lb-rank  { opacity: 0.6; min-width: 24px; }                              /* #1, #2... */
+      #leaderboard .lb-name  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* ime se skraćuje ako je dugo */
+      #leaderboard .lb-score { opacity: 0.85; }                                               /* vrednost mase/skora */
+      /* Separator "· · ·" koji se prikazuje između top-10 i pozicije trenutnog igrača */
+      #leaderboard .lb-separator {
+        text-align: center;
+        color: rgba(255,255,255,0.3);
+        font-size: 11px;
+        padding: 2px 0;
+        border-bottom: none;
       }
     </style>
   </head>
@@ -57,13 +109,19 @@ y <!doctype html>
     </div>
 
     <div id="score-hud">Score: 20</div>
+
+    <!-- Leaderboard panel: prikazuje top 10 igrača + poziciju trenutnog igrača -->
+    <div id="leaderboard">
+      <h3>Leaderboard</h3>
+      <ol id="leaderboard-list"></ol> <!-- Lista se popunjava dinamički u updateLeaderboard() -->
+    </div>
     
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
       // ─── SERVER URL ──────────────────────────────────────────────────────────────
-      const DEFAULT_SERVER = "http://localhost:8080"; 
+      const DEFAULT_SERVER = "http://localhost:8080";
       const params = new URLSearchParams(window.location.search);
       const SERVER_URL = params.get("server") || DEFAULT_SERVER;
       document.getElementById("server-info").textContent = "→ " + SERVER_URL;
@@ -74,12 +132,16 @@ y <!doctype html>
       const ctx = canvas.getContext("2d");
       const connectBtn = document.getElementById("connectBtn");
       const scoreHud = document.getElementById("score-hud");
+      const leaderboardEl = document.getElementById("leaderboard");       // ceo panel
+      const leaderboardList = document.getElementById("leaderboard-list"); // <ol> unutar panela
       
       let socket = null;
       let playerName = ""; // --------------------------------------------------------
       let player = { x: 400, y: 300, name: "" }; // ----------------------------------
-      let world = [];      // Inicijalizovano kao prazan niz
-      let foodItems = [];  // Inicijalizovano kao prazan niz
+      let world = [];
+      let foodItems = [];
+      let serverLeaderboard = []; // leaderboard koji šalje server (već sortiran top 10)
+      let myServerRank = 0;       // rang trenutnog igrača prema serveru
       let connected = false;
       let mouse = { x: 400, y: 300 };
       let lastDirection = { dx: 0, dy: 0 };
@@ -95,24 +157,36 @@ y <!doctype html>
         socket.on("connect", () => {
           socket.emit("join", { name: playerName });
           connected = true;
-          uiContainer.style.display = "none"; // -------------------------------------
-          scoreHud.style.display = "block";   // Prikazujemo fiksni skor
+          uiContainer.style.display = "none";
+          scoreHud.style.display = "block";
+          leaderboardEl.style.display = "block";
         });
 
         socket.on("state", (state) => {
-            // Ako state.players ne postoji, stavi prazan niz da 'find' ne baci grešku
-            world = state.players || []; 
-            foodItems = state.food || []; 
-            
+            world = state.players || [];
+            foodItems = state.food || [];
+            serverLeaderboard = state.leaderboard || [];
+
             if (world.length > 0) {
                 const me = world.find((p) => p.name === playerName);
                 if (me) {
                     player.x = me.x;
                     player.y = me.y;
-                    // Ažuriramo HUD skor u uglu ekrana
                     scoreHud.textContent = "Score: " + Math.round(me.mass || 20);
                 }
             }
+
+            // Izračunaj rang igrača van top 10
+            const inTop10 = serverLeaderboard.find((e) => e.name === playerName);
+            if (inTop10) {
+                myServerRank = inTop10.rank;
+            } else {
+                const sorted = [...world].sort((a, b) => (b.mass || 0) - (a.mass || 0));
+                myServerRank = sorted.findIndex((p) => p.name === playerName) + 1;
+            }
+
+            // Ažuriramo leaderboard odmah čim stigne novi state (svaki tick)
+            updateLeaderboard();
         });
       };
 
@@ -213,6 +287,47 @@ y <!doctype html>
         }
 
         ctx.restore();
+      }
+
+      // Ažurira leaderboard panel svakih 1 sekundu.
+      // Koristi serverLeaderboard (top 10 koji server već sortira po masi).
+      // Ako trenutni igrač nije u top 10, dodaje separator i njegov red ispod.
+      function updateLeaderboard() {
+        if (serverLeaderboard.length === 0) return; // server još nije poslao leaderboard
+
+        const myInTop10 = serverLeaderboard.some((e) => e.name === playerName);
+
+        leaderboardList.innerHTML = ""; // briše staru listu pre ponovnog crtanja
+
+        // Prikazujemo top 10 koje je server izračunao i poslao
+        serverLeaderboard.forEach((entry) => {
+          const li = document.createElement("li");
+          if (entry.name === playerName) li.classList.add("me"); // zelena boja za sebe
+          li.innerHTML =
+            `<span class="lb-rank">#${entry.rank}</span>` +
+            `<span class="lb-name">${entry.name}</span>` +
+            `<span class="lb-score">${entry.mass}</span>`;
+          leaderboardList.appendChild(li);
+        });
+
+        // Ako trenutni igrač nije u top 10, prikazujemo ga ispod separatora
+        if (!myInTop10 && myServerRank > 0) {
+          const me = world.find((p) => p.name === playerName);
+          if (me) {
+            const sep = document.createElement("li");
+            sep.className = "lb-separator";
+            sep.textContent = "· · ·"; // vizuelni razmak između top 10 i igrača
+            leaderboardList.appendChild(sep);
+
+            const li = document.createElement("li");
+            li.classList.add("me"); // zelena boja jer je to trenutni igrač
+            li.innerHTML =
+              `<span class="lb-rank">#${myServerRank}</span>` +
+              `<span class="lb-name">${me.name}</span>` +
+              `<span class="lb-score">${Math.round(me.mass || 0)}</span>`;
+            leaderboardList.appendChild(li);
+          }
+        }
       }
 
       function gameLoop() {

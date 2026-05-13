@@ -85,12 +85,21 @@ async def game_loop():
         engine.spawn_food(max_food=150)
 
         # Emitovanje trenutnog stanja klijentima
+        # Sortiraj igrače po masi (najveća = #1) i napravi leaderboard
+        sorted_players = sorted(players.values(), key=lambda p: p.mass, reverse=True)
+        leaderboard = [
+            {"rank": i + 1, "name": p.name, "mass": round(p.mass)}
+            for i, p in enumerate(sorted_players[:10])
+        ]
+
         state = {
             "players": [
                 {"name": p.name, "x": p.x, "y": p.y, "mass": p.mass}
                 for p in players.values()
             ],
-            "food": engine.food
+            "food": engine.food,
+            "leaderboard": leaderboard,           # top 10 sortiranih po masi
+            "total_players": len(players)         # ukupan broj igrača (za prikaz ranka van top 10)
         }
         await sio.emit("state", state)
 
