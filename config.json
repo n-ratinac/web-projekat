@@ -1,0 +1,25 @@
+{
+    "player": {
+        "base_speed": 20,
+        "initial_mass": 20,
+        "min_speed": 50, 
+        "mass_decay_rate": 0.01
+    },
+    "game": {
+        "width": 4000,
+        "height": 4000,
+        "tick_rate_seconds": 0.05,
+        "radius_factor": 4,
+        "eat_mass_ratio": 1.25,
+        "zoom_base": 50
+    },
+    "food": {
+        "max_food_count": 15,
+        "base_mass_gain": 1,
+        "percent_mass_gain": 0.01
+    },
+    "network": {
+        "host": "0.0.0.0",
+        "port": 8080
+    }
+}

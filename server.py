@@ -3,17 +3,21 @@ import random
 import time
 import socketio
 from aiohttp import web
+from settings import cfg
 from enigine import Engine
 from player import Player
 
+# Inicijalizacija Socket.IO servera
 sio = socketio.AsyncServer(async_mode='aiohttp', cors_allowed_origins='*')
 app = web.Application()
 sio.attach(app)
 
+# Globalne strukture za praćenje stanja
 players = {}
 inputs = {}
 
-engine = Engine(4000, 4000)
+# Engine se inicijalizuje sa vrednostima iz config-a
+engine = Engine(cfg['game']['width'], cfg['game']['height'])
 
 @sio.event
 async def connect(sid, environ):
@@ -22,8 +26,11 @@ async def connect(sid, environ):
 @sio.event
 async def join(sid, data):
     name = data.get("name", "Player")
-    x = random.randint(100, 700)
-    y = random.randint(100, 500)
+    
+    # Spawn pozicija na osnovu granica mape iz config-a
+    x = random.randint(100, cfg['game']['width'] - 100)
+    y = random.randint(100, cfg['game']['height'] - 100)
+    
     player = Player(name, x, y)
     players[sid] = player
     engine.add_player(player)
@@ -42,64 +49,68 @@ async def disconnect(sid):
     if sid in players:
         engine.remove_player(players[sid])
         del players[sid]
-        del inputs[sid]
+        if sid in inputs: del inputs[sid]
         print(f"Client disconnected: {sid}")
 
 async def game_loop():
-    TICK_RATE = 0.05
+    # Učitavamo TICK_RATE iz config-a
+    tick_rate = cfg['game'].get('tick_rate_seconds', 0.05)
     last_time = time.monotonic()
 
     while True:
-        await asyncio.sleep(TICK_RATE)
+        await asyncio.sleep(tick_rate)
 
         now = time.monotonic()
         dt = now - last_time
         last_time = now
 
+        # Pomeranje i fizika
         for sid, player in list(players.items()):
             direction = inputs.get(sid, (0, 0))
             engine.move_player(player, direction, dt)
             engine.eat_food(player)
-            engine.decay_mass(player, dt)  # Mass decay svaki tick
+            engine.decay_mass(player, dt) 
 
-        # ---> Rešavamo jedenje igrača nakon svih pomeranja <---
+        # Rešavanje sudara igrača
         eaten = engine.resolve_player_collisions()
         
         for dead_player in eaten:
             dead_sid = None
-            # Trazimo sid (Socket ID) na osnovu instance igrača
             for sid, p in players.items():
                 if p == dead_player:
                     dead_sid = sid
                     break
                     
             if dead_sid:
-                # Emitujemo 'death' event tom klijentu
                 await sio.emit("death", to=dead_sid)
-                
-                # Brišemo ga sa servera i iz rečnika inputa
-                del players[dead_sid]
-                if dead_sid in inputs:
-                    del inputs[dead_sid]
+                if dead_sid in players: del players[dead_sid]
+                if dead_sid in inputs: del inputs[dead_sid]
 
-        engine.spawn_food(max_food=150)
+        # Spawn hrane do limita iz config-a
+        engine.spawn_food(max_food=cfg['food'].get('max_food_count', 150))
 
-        # Emitovanje trenutnog stanja klijentima
-        # Sortiraj igrače po masi (najveća = #1) i napravi leaderboard
+        # Leaderboard
         sorted_players = sorted(players.values(), key=lambda p: p.mass, reverse=True)
         leaderboard = [
             {"rank": i + 1, "name": p.name, "mass": round(p.mass)}
             for i, p in enumerate(sorted_players[:10])
         ]
 
+        # STANJE KOJE SE ŠALJE KLIJENTU
         state = {
             "players": [
                 {"name": p.name, "x": p.x, "y": p.y, "mass": p.mass}
                 for p in players.values()
             ],
             "food": engine.food,
-            "leaderboard": leaderboard,           # top 10 sortiranih po masi
-            "total_players": len(players)         # ukupan broj igrača (za prikaz ranka van top 10)
+            "leaderboard": leaderboard,
+            "total_players": len(players),
+            # DODATO: Slanje config-a klijentu radi dinamičkog zooma i granica mape
+            "config": {
+                "zoom_base": cfg['game'].get('zoom_base', 20),
+                "map_width": cfg['game']['width'],
+                "map_height": cfg['game']['height']
+            }
         }
         await sio.emit("state", state)
 
@@ -117,4 +128,8 @@ app.on_startup.append(start_game_loop)
 app.on_cleanup.append(stop_game_loop)
 
 if __name__ == "__main__":
-    web.run_app(app, host="0.0.0.0", port=8080)
+    web.run_app(
+        app, 
+        host=cfg['network'].get('host', '0.0.0.0'), 
+        port=cfg['network'].get('port', 8080)
+    )
