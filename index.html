@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -209,6 +209,12 @@
           statusEl.textContent = 'Waiting for you to join...';
         }
 
+        if (data.type === 'death') {
+          isJoined = false;
+          overlay.style.display = 'flex';
+          statusEl.textContent = 'You died! Click Play to respawn.';
+        }
+
         if (data.type === 'state') {
           // Update players
           const nextPlayers = {};
@@ -289,6 +295,8 @@
       isJoined = true;
       overlay.style.display = 'none';
       statusEl.textContent = `Playing as ${name}. Move mouse to navigate.`;
+      targetX = 0;
+      targetY = 0;
       sendMove();
     });
 
@@ -301,8 +309,8 @@
       const mouseY = event.clientY - rect.top;
 
       // Convert screen coordinates to world coordinates
-      const worldMouseX = cameraX + (mouseX - canvas.width / 2) / zoom;
-      const worldMouseY = cameraY + (mouseY - canvas.height / 2) / zoom;
+      const worldMouseX = cameraX + mouseX / zoom;
+      const worldMouseY = cameraY + mouseY / zoom;
 
       targetX = worldMouseX;
       targetY = worldMouseY;
@@ -330,7 +338,7 @@
       cameraY += (targetCamY - cameraY) * 0.1;
 
       // Zoom based on mass
-      const baseZoom = 0.5;
+      const baseZoom = 1.2;
       zoom = baseZoom / Math.sqrt(myMass / 20);
 
       // Draw grid
