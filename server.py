@@ -80,7 +80,31 @@ async def handler(websocket):
                             "eater": p["id"],
                             "new_radius": p["radius"]
                         })
+                
+                # Provera jestivosti igrača (30% veći može da jede manji)
+                eaten_someone = False
+                for ws_other, other in list(players.items()):
+                    if ws_other != websocket and other["id"] != p["id"]:
+                        dist = ((p["x"] - other["x"])**2 + (p["y"] - other["y"])**2)**0.5
+                        # Veliki igač jede manjeg (mora biti 30% veći)
+                        if dist < p["radius"] and p["radius"] > other["radius"] * 1.3:
+                            # Veliki igač povećava svoj radius proporcionalno pojedenom igraču
+                            p["radius"] += other["radius"] * 0.2
+                            # Manji igač se resetuje
+                            other["x"] = random.randint(100, WORLD_WIDTH - 100)
+                            other["y"] = random.randint(100, WORLD_HEIGHT - 100)
+                            other["radius"] = PLAYER_START_RADIUS
+                            eaten_someone = True
+                            
+                            await broadcast({
+                                "type": "player_eaten",
+                                "eaten_id": other["id"],
+                                "eater_id": p["id"],
+                                "eater_new_radius": p["radius"],
+                                "eaten_new_pos": {"x": other["x"], "y": other["y"], "radius": other["radius"]}
+                            })
 
+                # Uvek pošalji player_moved sa trenutnom pozicijom i radiusom
                 await broadcast({
                     "type": "player_moved",
                     "id": p["id"], "x": p["x"], "y": p["y"], "radius": p["radius"]
@@ -95,7 +119,9 @@ async def handler(websocket):
         if state: await broadcast({"type": "player_left", "id": state["id"]})
 
 async def main():
+    print("🚀 Server se pokreće na ws://localhost:8765...")
     async with websockets.serve(handler, "localhost", 8765):
+        print("✅ Server je aktivan i čeka konekcije!")
         await asyncio.Future()
 
 if __name__ == "__main__":

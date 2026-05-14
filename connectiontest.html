@@ -22,12 +22,85 @@
   header h1 { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; color: var(--accent); }
   .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
   .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
-  .main { flex: 1; display: flex; overflow: hidden; }
+  .main { flex: 1; display: none; overflow: hidden; } /* Skriveno dok se ne unese ime */
   #canvas-wrap { flex: 1; position: relative; background: var(--bg); }
   canvas { display: block; cursor: crosshair; }
-  aside { width: 220px; background: var(--panel); border-left: 1px solid var(--border); }
-  #player-list { padding: 10px; font-size: 0.8rem; }
+  aside { width: 280px; background: var(--panel); border-left: 1px solid var(--border); overflow-y: auto; }
+  #player-list { padding: 10px; font-size: 0.75rem; }
+  #leaderboard { padding: 10px; font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 10px; }
+  #leaderboard h4 { color: var(--accent); margin-bottom: 8px; font-size: 0.9rem; }
+  .leaderboard-entry { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(26,58,92,0.5); }
+  .leaderboard-entry:last-child { border-bottom: none; }
+  .leaderboard-rank { color: var(--accent); font-weight: bold; min-width: 20px; }
+  .leaderboard-name { color: var(--text); flex: 1; margin-left: 8px; }
+  .leaderboard-score { color: var(--green); font-weight: bold; }
   .is-self { color: var(--accent); font-weight: bold; }
+  
+  /* Modal za unos imena */
+  #name-modal {
+    display: flex;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5, 10, 15, 0.95);
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+  .modal-content {
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+    min-width: 350px;
+  }
+  .modal-content h2 {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--accent);
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+  }
+  .modal-content p {
+    color: var(--text);
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+  }
+  .modal-input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--accent);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    border-radius: 4px;
+  }
+  .modal-input:focus {
+    outline: none;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+  }
+  .modal-button {
+    padding: 12px 30px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 4px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .modal-button:hover {
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.7);
+    transform: scale(1.05);
+  }
+  .modal-button:active {
+    transform: scale(0.95);
+  }
 </style>
 </head>
 <body>
@@ -39,9 +112,21 @@
   <input id="name-input" type="text" placeholder="Ime..." style="background:none; border:1px solid var(--border); color:#fff; padding:4px;">
 </header>
 
+<div id="name-modal">
+  <div class="modal-content">
+    <h2>⚔️ AGAR.IO</h2>
+    <p>Unesi svoje ratničko ime:</p>
+    <input id="modal-name-input" type="text" class="modal-input" placeholder="Tvoje ime..." maxlength="15">
+    <button class="modal-button" id="modal-start-btn">POČNI IGRU</button>
+  </div>
+</div>
+
 <div class="main">
   <div id="canvas-wrap"><canvas id="canvas"></canvas></div>
-  <aside><div id="player-list"></div></aside>
+  <aside>
+    <div id="player-list"></div>
+    <div id="leaderboard"></div>
+  </aside>
 </div>
 
 <script>
@@ -53,6 +138,40 @@ let ws, selfState = null;
 const others = new Map(), food = new Map();
 let cam = { x: 1000, y: 1000 };
 let mouse = { x: 0, y: 0 };
+let playerName = "Igrač";
+let lastRadius = 0; // Prati prethodni radius da detektakujem kada je igrač pojeden
+
+// Modal za unos imena
+const modal = document.getElementById("name-modal");
+const modalInput = document.getElementById("modal-name-input");
+const startBtn = document.getElementById("modal-start-btn");
+
+startBtn.addEventListener("click", startGame);
+modalInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") startGame();
+});
+
+function startGame() {
+  const name = modalInput.value.trim();
+  if (name.length === 0) {
+    alert("Unesi svoje ime!");
+    return;
+  }
+  playerName = name;
+  lastRadius = 0;
+  modal.style.display = "none";
+  document.querySelector(".main").style.display = "flex";
+  
+  // Čekaj da browser preuračuna veličine pre nego što se resize() pozove
+  requestAnimationFrame(() => {
+    resize();
+    connect();
+    draw();
+  });
+}
+
+// Fokusiraj input na početku
+modalInput.focus();
 
 function resize() {
   canvas.width = document.getElementById("canvas-wrap").clientWidth;
@@ -69,36 +188,85 @@ window.addEventListener("mousemove", (e) => {
 
 function connect() {
   ws = new WebSocket("ws://localhost:8765");
-  ws.onopen = () => document.getElementById("dot").classList.add("connected");
+  ws.onopen = () => {
+    document.getElementById("dot").classList.add("connected");
+    // Pošalji ime serveru
+    ws.send(JSON.stringify({ type: "set_name", name: playerName }));
+  };
   ws.onmessage = (e) => {
     const msg = JSON.parse(e.data);
     if (msg.type === "init") {
       selfState = msg.self;
+      selfState.name = playerName; // Postavi ime koje je korisnik unio
       msg.players.forEach(p => others.set(p.id, p));
       msg.food.forEach(f => food.set(f.id, f));
       refreshList();
+      refreshLeaderboard();
     } else if (msg.type === "food_update") {
       food.delete(msg.eaten);
       food.set(msg.new_item.id, msg.new_item);
       if (selfState && msg.eater === selfState.id) selfState.radius = msg.new_radius;
       else if (others.has(msg.eater)) others.get(msg.eater).radius = msg.new_radius;
+      refreshLeaderboard();
     } else if (msg.type === "player_moved") {
       if (others.has(msg.id)) {
         let p = others.get(msg.id);
         p.x = msg.x; p.y = msg.y; p.radius = msg.radius;
       }
+      refreshLeaderboard();
+    } else if (msg.type === "player_eaten") {
+      // Ako JA budem pojedeno
+      if (selfState && msg.eaten_id === selfState.id) {
+        selfState.x = msg.eaten_new_pos.x;
+        selfState.y = msg.eaten_new_pos.y;
+        selfState.radius = msg.eaten_new_pos.radius;
+      }
+      // Ako neko drugi bude pojedeno
+      if (others.has(msg.eaten_id)) {
+        let eaten = others.get(msg.eaten_id);
+        eaten.x = msg.eaten_new_pos.x;
+        eaten.y = msg.eaten_new_pos.y;
+        eaten.radius = msg.eaten_new_pos.radius;
+      }
+      // Veći igrač se povećava
+      if (selfState && msg.eater_id === selfState.id) {
+        selfState.radius = msg.eater_new_radius;
+      } else if (others.has(msg.eater_id)) {
+        others.get(msg.eater_id).radius = msg.eater_new_radius;
+      }
+      refreshList();
+      refreshLeaderboard();
     } else if (msg.type === "player_joined") {
       others.set(msg.player.id, msg.player);
       refreshList();
+      refreshLeaderboard();
     } else if (msg.type === "player_left") {
       others.delete(msg.id);
       refreshList();
+      refreshLeaderboard();
     }
   };
 }
 
 function draw() {
+  // Detektuj ako je igrač pojeden (radius resetovan na početnu vrednost)
+  if (selfState && lastRadius > 22 && selfState.radius === 22) {
+    // Igrač je pojeden! Vrati ga na početak
+    ws.close();
+    food.clear();
+    others.clear();
+    selfState = null;
+    lastRadius = 0;
+    document.querySelector(".main").style.display = "none";
+    modal.style.display = "flex";
+    modalInput.value = ""; // Očisti input za novo ime
+    modalInput.focus();
+    return;
+  }
+  
   if (selfState) {
+    lastRadius = selfState.radius; // Prati trenutni radius
+    
     // 1. Mehanika kretanja
     const dx = mouse.x - canvas.width / 2;
     const dy = mouse.y - canvas.height / 2;
@@ -187,8 +355,41 @@ function refreshList() {
   });
 }
 
-connect();
-draw();
+function refreshLeaderboard() {
+  const board = document.getElementById("leaderboard");
+  board.innerHTML = "<h4>🏆 LEADERBOARD TOP 8</h4>";
+  
+  // Skupi sve igrače sa skorom (radius = score)
+  const all = selfState ? [{...selfState, isSelf:true}, ...others.values()] : [...others.values()];
+  
+  // Sortiraj po radiusu (većeg prvo)
+  all.sort((a, b) => b.radius - a.radius);
+  
+  // Prikaži samo top 8
+  const top8 = all.slice(0, 8);
+  top8.forEach((p, idx) => {
+    const entry = document.createElement("div");
+    entry.className = "leaderboard-entry";
+    if(p.isSelf) entry.style.backgroundColor = "rgba(0, 212, 255, 0.1)";
+    
+    const rank = document.createElement("span");
+    rank.className = "leaderboard-rank";
+    rank.textContent = (idx + 1) + ".";
+    
+    const name = document.createElement("span");
+    name.className = "leaderboard-name";
+    name.textContent = p.name;
+    
+    const score = document.createElement("span");
+    score.className = "leaderboard-score";
+    score.textContent = Math.floor(p.radius);
+    
+    entry.appendChild(rank);
+    entry.appendChild(name);
+    entry.appendChild(score);
+    board.appendChild(entry);
+  });
+}
 </script>
 </body>
 </html>
