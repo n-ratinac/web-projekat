@@ -81,6 +81,26 @@ async def handler(websocket):
                             "new_radius": p["radius"]
                         })
 
+                # Provera jedenja drugih igraca
+                for ws_other, other in list(players.items()):
+                    if ws_other == websocket: continue
+                    dist = ((p["x"] - other["x"])**2 + (p["y"] - other["y"])**2)**0.5
+                    if dist < p["radius"] and p["radius"] > other["radius"] * 1.25:
+                        # Jedemo drugog igraca
+                        p["radius"] += other["radius"] * 0.5  # Rast za pola radiusa pojedenog
+                        eaten_ws = ws_other
+                        eaten_state = players.pop(eaten_ws, None)
+                        if eaten_ws:
+                            try:
+                                await eaten_ws.send(json.dumps({"type": "died"}))
+                            except: pass
+                        await broadcast({
+                            "type": "player_eaten",
+                            "eater": p["id"],
+                            "eaten": other["id"],
+                            "new_radius": p["radius"]
+                        })
+
                 await broadcast({
                     "type": "player_moved",
                     "id": p["id"], "x": p["x"], "y": p["y"], "radius": p["radius"]

@@ -93,6 +93,14 @@ function connect() {
     } else if (msg.type === "player_left") {
       others.delete(msg.id);
       refreshList();
+    } else if (msg.type === "player_eaten") {
+      others.delete(msg.eaten);
+      if (selfState && msg.eater === selfState.id) selfState.radius = msg.new_radius;
+      else if (others.has(msg.eater)) others.get(msg.eater).radius = msg.new_radius;
+      refreshList();
+    } else if (msg.type === "died") {
+      alert("Pojeden si!");
+      ws.close();
     }
   };
 }
