@@ -136,7 +136,7 @@
   </div>
 
   <div id="status">Connecting to server...</div>
-  <div id="mass">Mass: 20</div>
+  <div id="mass">Mass: 50</div>
 
   <div id="leaderboard">
     <h3>Leaderboard</h3>
@@ -157,14 +157,16 @@
 
     let socket = null;
     let clientId = null;
-    let worldSize = 4000;
+    let worldSize = 3000;
     let isJoined = false;
     let cameraX = 0;
     let cameraY = 0;
     let targetX = 0;
     let targetY = 0;
-    let myMass = 20;
+    let myMass = 100;
     let zoom = 0.5;
+    let targetZoom = 0.5;
+    let pendingJoinName = null;
 
     const players = {};
     const bots = {};
@@ -190,6 +192,16 @@
 
       socket.addEventListener('open', () => {
         statusEl.textContent = 'Connected. Enter a name and join the game.';
+        if (pendingJoinName) {
+          socket.send(JSON.stringify({ type: 'join', name: pendingJoinName }));
+          isJoined = true;
+          overlay.style.display = 'none';
+          statusEl.textContent = `Playing as ${pendingJoinName}. Move mouse to navigate.`;
+          targetX = 0;
+          targetY = 0;
+          sendMove();
+          pendingJoinName = null;
+        }
       });
 
       socket.addEventListener('message', (event) => {
@@ -287,10 +299,13 @@
     }
 
     playBtn.addEventListener('click', () => {
+      const name = nickInput.value.trim().slice(0, 16) || 'Player';
       if (!socket || socket.readyState !== WebSocket.OPEN) {
+        pendingJoinName = name;
+        statusEl.textContent = 'Connecting to server...';
+        connect();
         return;
       }
-      const name = nickInput.value.trim().slice(0, 16) || 'Player';
       socket.send(JSON.stringify({ type: 'join', name }));
       isJoined = true;
       overlay.style.display = 'none';
@@ -337,26 +352,41 @@
       cameraX += (targetCamX - cameraX) * 0.1;
       cameraY += (targetCamY - cameraY) * 0.1;
 
-      // Zoom based on mass
-      const baseZoom = 1.2;
-      zoom = baseZoom / Math.sqrt(myMass / 20);
+      // Zoom based on mass - smooth transition
+      const baseZoom = 1.5;
+      targetZoom = baseZoom / Math.sqrt(myMass / 50);
+      zoom += (targetZoom - zoom) * 0.03;
 
       // Draw grid
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.lineWidth = 1;
       const gridSize = 200;
-      for (let x = -cameraX % gridSize; x < canvas.width; x += gridSize * zoom) {
+      const gridOffsetX = Math.floor(cameraX / gridSize) * gridSize;
+      const gridOffsetY = Math.floor(cameraY / gridSize) * gridSize;
+      
+      for (let x = gridOffsetX - cameraX; x < canvas.width / zoom; x += gridSize) {
+        const screenX = x * zoom;
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
+        ctx.moveTo(screenX, 0);
+        ctx.lineTo(screenX, canvas.height);
         ctx.stroke();
       }
-      for (let y = -cameraY % gridSize; y < canvas.height; y += gridSize * zoom) {
+      for (let y = gridOffsetY - cameraY; y < canvas.height / zoom; y += gridSize) {
+        const screenY = y * zoom;
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
+        ctx.moveTo(0, screenY);
+        ctx.lineTo(canvas.width, screenY);
         ctx.stroke();
       }
+
+      // Draw world border
+      ctx.strokeStyle = '#7ef7a0';
+      ctx.lineWidth = 3;
+      const borderX = (0 - cameraX) * zoom;
+      const borderY = (0 - cameraY) * zoom;
+      const borderWidth = worldSize * zoom;
+      const borderHeight = worldSize * zoom;
+      ctx.strokeRect(borderX, borderY, borderWidth, borderHeight);
 
       // Draw food
       for (const id in food) {

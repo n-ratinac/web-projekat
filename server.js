@@ -6,7 +6,7 @@ const WebSocket = require('ws');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname);
 const WORLD_SIZE = 4000;
-const FOOD_COUNT = 800;
+const FOOD_COUNT = 1200;
 const BOT_COUNT = 15;
 const TICK_RATE = 1000 / 60; // 60 FPS
 const clients = new Map();
@@ -32,7 +32,7 @@ function generateId() {
 }
 
 function randomBotName() {
-  const names = ['Bot1', 'Bot2', 'Bot3', 'Bot4', 'Bot5', 'Bot6', 'Bot7', 'Bot8', 'Bot9', 'Bot10'];
+  const names = ['Shadow', 'Titan', 'Ghost', 'Viper', 'Kraken', 'Blaze', 'Phoenix', 'Ranger', 'Nexus', 'Hunter', 'Storm', 'Fury', 'Wolf', 'Eagle', 'Demon'];
   return names[Math.floor(Math.random() * names.length)];
 }
 
@@ -118,16 +118,18 @@ function updateClients() {
       const dy = client.targetY - client.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist > 0) {
-        const speed = 2 / Math.sqrt(client.mass);
-        const nx = dx / dist;
-        const ny = dy / dist;
-        client.vx += nx * speed * 0.5;
-        client.vy += ny * speed * 0.5;
+        client.dirX = dx / dist;
+        client.dirY = dy / dist;
       }
     }
+    
+    // Always apply acceleration in the stored direction
+    const speed = 2.5 / Math.sqrt(client.mass);
+    client.vx += client.dirX * speed * 1.2;
+    client.vy += client.dirY * speed * 1.2;
 
-    client.vx *= 0.85;
-    client.vy *= 0.85;
+    client.vx *= 0.97;
+    client.vy *= 0.97;
 
     client.x = Math.max(0, Math.min(WORLD_SIZE, client.x + client.vx));
     client.y = Math.max(0, Math.min(WORLD_SIZE, client.y + client.vy));
@@ -196,7 +198,7 @@ function checkCollisions() {
           bot.mass += client.mass;
           client.x = Math.random() * (WORLD_SIZE - 200) + 100;
           client.y = Math.random() * (WORLD_SIZE - 200) + 100;
-          client.mass = 20;
+          client.mass = 50;
         }
       }
     });
@@ -276,13 +278,15 @@ wss.on('connection', (ws) => {
     id,
     x: Math.random() * (WORLD_SIZE - 200) + 100,
     y: Math.random() * (WORLD_SIZE - 200) + 100,
-    mass: 20,
+    mass: 50,
     color: randomColor(),
     name: `Player-${id}`,
     vx: 0,
     vy: 0,
     targetX: undefined,
     targetY: undefined,
+    dirX: 0,
+    dirY: 0,
     ws,
   };
 
