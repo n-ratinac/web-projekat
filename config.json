@@ -1,9 +1,10 @@
 {
     "player": {
-        "base_speed": 20,
+        "base_speed": 200,
         "initial_mass": 20,
-        "min_speed": 50, 
-        "mass_decay_rate": 0.01
+        "min_speed": 50,
+        "mass_decay_rate": 0.01,
+        "merge_cooldown": 15
     },
     "game": {
         "width": 4000,
@@ -14,7 +15,7 @@
         "zoom_base": 50
     },
     "food": {
-        "max_food_count": 15,
+        "max_food_count": 300,
         "base_mass_gain": 1,
         "percent_mass_gain": 0.01
     },

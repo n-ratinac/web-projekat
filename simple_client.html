@@ -171,7 +171,11 @@
             if (me) {
                 playerPos.x = me.x;
                 playerPos.y = me.y;
-                scoreHud.textContent = "Score: " + Math.round(me.mass);
+                // IZMENA (iz prvog rešenja): skor prikazuje ukupnu masu svih ćelija
+                const totalMass = me.cells
+                    ? me.cells.reduce((s, c) => s + c.mass, 0)
+                    : me.mass;
+                scoreHud.textContent = "Score: " + Math.round(totalMass);
             }
 
             // Rangiranje
@@ -202,6 +206,13 @@
         mouse.y = e.clientY;
       });
 
+      document.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && connected && socket) {
+          e.preventDefault();
+          socket.emit("split", {});
+        }
+      });
+
       function sendDirection() {
         if (!socket || !connected) return;
         const dx = mouse.x - canvas.width / 2;
@@ -218,13 +229,16 @@
         
         ctx.save();
         if (me) {
-            // ZOOM LOGIKA IZ CONFIGA
-            // Što je veća masa, kamera se više odmiče
-            let zoom = Math.pow(gameConfig.zoom_base / (me.mass || 20), 0.4);
+            // IZMENA (iz prvog rešenja): kamera prati lead cell, zoom računa totalMass
+            const leadCell = (me.cells && me.cells.length > 0) ? me.cells[0] : me;
+            const totalMass = me.cells
+                ? me.cells.reduce((s, c) => s + c.mass, 0)
+                : me.mass;
+            let zoom = Math.pow(gameConfig.zoom_base / (totalMass || 20), 0.4);
             
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.scale(zoom, zoom);
-            ctx.translate(-me.x, -me.y);
+            ctx.translate(-leadCell.x, -leadCell.y);
         }
 
         // CRTANJE MAPE (Dimenzije iz configa)
@@ -244,26 +258,34 @@
         }
 
         // IGRAČI
+        // IZMENA (iz prvog rešenja): iteriramo kroz sve ćelije iz p.cells[]
+        // umesto da primarnu crtamo posebno a split ćelije posebno
         for (const p of world) {
-            let radius = Math.sqrt(p.mass) * 4; 
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
-            ctx.fill();
-            ctx.strokeStyle = "white";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            ctx.closePath();
+            const cellsToDraw = (p.cells && p.cells.length > 0)
+                ? p.cells
+                : [{ x: p.x, y: p.y, mass: p.mass }];
 
-            // Ime
-            let fontSize = Math.max(12, Math.round(radius * 0.3));
-            ctx.font = `bold ${fontSize}px Arial`;
-            ctx.textAlign = "center";
-            ctx.fillStyle = "white";
-            ctx.strokeStyle = "black";
-            ctx.lineWidth = 3;
-            ctx.strokeText(p.name, p.x, p.y);
-            ctx.fillText(p.name, p.x, p.y);
+            for (const cell of cellsToDraw) {
+                let radius = Math.sqrt(cell.mass) * 4;
+                ctx.beginPath();
+                ctx.arc(cell.x, cell.y, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = p.name === playerName ? "#0f0" : "#09f";
+                ctx.fill();
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.closePath();
+
+                // Ime
+                let fontSize = Math.max(12, Math.round(radius * 0.3));
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = "center";
+                ctx.fillStyle = "white";
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 3;
+                ctx.strokeText(p.name, cell.x, cell.y);
+                ctx.fillText(p.name, cell.x, cell.y);
+            }
         }
         ctx.restore();
       }

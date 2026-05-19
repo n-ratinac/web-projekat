@@ -44,6 +44,12 @@ async def update_input(sid, data):
         dy = float(data.get("dy", 0))
         inputs[sid] = (dx, dy)
 
+# DODATO: split event handler — direktna split funkcionalnost iz 'commit' grane
+@sio.event
+async def split(sid, data):
+    if sid in players:
+        players[sid].split()
+
 @sio.event
 async def disconnect(sid):
     if sid in players:
@@ -69,7 +75,8 @@ async def game_loop():
             direction = inputs.get(sid, (0, 0))
             engine.move_player(player, direction, dt)
             engine.eat_food(player)
-            engine.decay_mass(player, dt) 
+            engine.decay_mass(player, dt)
+            engine.merge_cells(player)  # DODATO: spajanje ćelija nakon cooldown-a
 
         # Rešavanje sudara igrača
         eaten = engine.resolve_player_collisions()
@@ -90,16 +97,18 @@ async def game_loop():
         engine.spawn_food(max_food=cfg['food'].get('max_food_count', 150))
 
         # Leaderboard
-        sorted_players = sorted(players.values(), key=lambda p: p.mass, reverse=True)
+        sorted_players = sorted(players.values(), key=lambda p: p.total_mass, reverse=True)
         leaderboard = [
-            {"rank": i + 1, "name": p.name, "mass": round(p.mass)}
+            {"rank": i + 1, "name": p.name, "mass": round(p.total_mass)}
             for i, p in enumerate(sorted_players[:10])
         ]
 
         # STANJE KOJE SE ŠALJE KLIJENTU
         state = {
             "players": [
-                {"name": p.name, "x": p.x, "y": p.y, "mass": p.mass}
+                # IZMENA: dodato polje "cells" — strogo neophodna zavisnost
+                # kako bi klijent mogao da iscrtava split ćelije
+                {"name": p.name, "x": p.x, "y": p.y, "mass": p.total_mass, "cells": [{"x": c.x, "y": c.y, "mass": c.mass} for c in p.cells]}
                 for p in players.values()
             ],
             "food": engine.food,
