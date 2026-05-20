@@ -2,393 +2,500 @@
 <html lang="sr">
 <head>
 <meta charset="UTF-8">
-<title>Agar.io — Connection Test</title>
+<title>Agar.io</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg: #050a0f; --panel: #0b1520; --border: #1a3a5c;
-    --accent: #00d4ff; --text: #c8e6f5; --green: #00ff88; --red: #ff4444;
-  }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-  }
-  header {
-    display: flex; align-items: center; gap: 16px; padding: 10px 20px;
-    background: var(--panel); border-bottom: 1px solid var(--border);
-  }
-  header h1 { font-family: 'Orbitron', sans-serif; font-size: 1.1rem; color: var(--accent); }
-  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
-  .status-dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); }
-  .main { flex: 1; display: none; overflow: hidden; } /* Skriveno dok se ne unese ime */
-  #canvas-wrap { flex: 1; position: relative; background: var(--bg); }
-  canvas { display: block; cursor: crosshair; }
-  aside { width: 280px; background: var(--panel); border-left: 1px solid var(--border); overflow-y: auto; }
-  #player-list { padding: 10px; font-size: 0.75rem; }
-  #leaderboard { padding: 10px; font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 10px; }
-  #leaderboard h4 { color: var(--accent); margin-bottom: 8px; font-size: 0.9rem; }
-  .leaderboard-entry { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(26,58,92,0.5); }
-  .leaderboard-entry:last-child { border-bottom: none; }
-  .leaderboard-rank { color: var(--accent); font-weight: bold; min-width: 20px; }
-  .leaderboard-name { color: var(--text); flex: 1; margin-left: 8px; }
-  .leaderboard-score { color: var(--green); font-weight: bold; }
-  .is-self { color: var(--accent); font-weight: bold; }
-  
-  /* Modal za unos imena */
-  #name-modal {
-    display: flex;
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(5, 10, 15, 0.95);
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-    backdrop-filter: blur(4px);
-  }
-  .modal-content {
-    background: var(--panel);
-    border: 2px solid var(--accent);
-    border-radius: 8px;
-    padding: 40px;
-    text-align: center;
-    box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
-    min-width: 350px;
-  }
-  .modal-content h2 {
-    font-family: 'Orbitron', sans-serif;
-    color: var(--accent);
-    margin-bottom: 20px;
-    font-size: 1.5rem;
-  }
-  .modal-content p {
-    color: var(--text);
-    margin-bottom: 20px;
-    font-size: 0.95rem;
-  }
-  .modal-input {
-    width: 100%;
-    padding: 12px;
-    margin-bottom: 20px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--accent);
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1rem;
-    border-radius: 4px;
-  }
-  .modal-input:focus {
-    outline: none;
-    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
-  }
-  .modal-button {
-    padding: 12px 30px;
-    background: var(--accent);
-    color: var(--bg);
-    border: none;
-    border-radius: 4px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.3s;
-  }
-  .modal-button:hover {
-    box-shadow: 0 0 15px rgba(0, 212, 255, 0.7);
-    transform: scale(1.05);
-  }
-  .modal-button:active {
-    transform: scale(0.95);
-  }
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#050a0f;--panel:#0b1520;--border:#1a3a5c;--accent:#00d4ff;--text:#c8e6f5;--green:#00ff88;--red:#ff4444}
+  body{background:var(--bg);color:var(--text);font-family:'Share Tech Mono',monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;gap:16px;padding:10px 20px;background:var(--panel);border-bottom:1px solid var(--border)}
+  header h1{font-family:'Orbitron',sans-serif;font-size:1.1rem;color:var(--accent)}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--red)}
+  .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .main{flex:1;display:none;overflow:hidden}
+  #cw{flex:1;position:relative}
+  canvas{display:block;cursor:crosshair}
+  aside{width:220px;background:var(--panel);border-left:1px solid var(--border)}
+  #lb{padding:10px;font-size:.75rem}
+  #lb h4{color:var(--accent);margin-bottom:8px}
+  .lbr{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(26,58,92,.4)}
+  .lbr:last-child{border-bottom:none}
+  .rk{color:var(--accent);font-weight:bold;min-width:18px}
+  .nm{flex:1;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sc{color:var(--green);font-weight:bold}
+  .me{background:rgba(0,212,255,.08)}
+  #modal{display:flex;position:fixed;inset:0;background:rgba(5,10,15,.95);justify-content:center;align-items:center;z-index:999;backdrop-filter:blur(4px)}
+  .mc{background:var(--panel);border:2px solid var(--accent);border-radius:8px;padding:40px;text-align:center;box-shadow:0 0 30px rgba(0,212,255,.3);min-width:320px}
+  .mc h2{font-family:'Orbitron',sans-serif;color:var(--accent);margin-bottom:20px;font-size:1.4rem}
+  .mc p{margin-bottom:16px}
+  .mi{width:100%;padding:10px;margin-bottom:16px;background:rgba(0,0,0,.3);border:1px solid var(--accent);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:1rem;border-radius:4px}
+  .mi:focus{outline:none;box-shadow:0 0 10px rgba(0,212,255,.5)}
+  .mb{padding:10px 28px;background:var(--accent);color:var(--bg);border:none;border-radius:4px;font-family:'Share Tech Mono',monospace;font-size:1rem;font-weight:bold;cursor:pointer}
+  .mb:hover{box-shadow:0 0 15px rgba(0,212,255,.6)}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="status-dot" id="dot"></div>
+  <div class="dot" id="dot"></div>
   <h1>AGAR.IO</h1>
-  <div style="flex:1"></div>
-  <input id="name-input" type="text" placeholder="Ime..." style="background:none; border:1px solid var(--border); color:#fff; padding:4px;">
 </header>
-
-<div id="name-modal">
-  <div class="modal-content">
+<div id="modal">
+  <div class="mc">
     <h2>⚔️ AGAR.IO</h2>
     <p>Unesi svoje ratničko ime:</p>
-    <input id="modal-name-input" type="text" class="modal-input" placeholder="Tvoje ime..." maxlength="15">
-    <button class="modal-button" id="modal-start-btn">POČNI IGRU</button>
+    <input id="ni" type="text" class="mi" placeholder="Tvoje ime..." maxlength="15">
+    <button class="mb" id="sb">POČNI IGRU</button>
   </div>
 </div>
-
 <div class="main">
-  <div id="canvas-wrap"><canvas id="canvas"></canvas></div>
-  <aside>
-    <div id="player-list"></div>
-    <div id="leaderboard"></div>
-  </aside>
+  <div id="cw"><canvas id="canvas"></canvas></div>
+  <aside><div id="lb"></div></aside>
 </div>
 
 <script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const WORLD_W = 2000, WORLD_H = 2000;
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const W = 2000, H = 2000;
+const PLAYER_START_RADIUS = 22;
 
-let ws, selfState = null;
-const others = new Map(), food = new Map();
-let cam = { x: 1000, y: 1000 };
-let mouse = { x: 0, y: 0 };
-let playerName = "Igrač";
-let lastRadius = 0; // Prati prethodni radius da detektakujem kada je igrač pojeden
+// ── State ────────────────────────────────────────────────────────────────────
+let ws, selfId = null;
+const players  = new Map();  // id -> player
+const foodMap  = new Map();
+const viruses  = [];
+let cam        = { x:1000, y:1000, zoom:1 };
+let tcam       = { x:1000, y:1000, zoom:1 };
+let mouse      = { x:0, y:0 };
+let playerName = 'Igrač';
+let lastSend   = 0;
+const SEND_MS  = 50;
 
-// Modal za unos imena
-const modal = document.getElementById("name-modal");
-const modalInput = document.getElementById("modal-name-input");
-const startBtn = document.getElementById("modal-start-btn");
+// Interpolacija: koliko brzo render pozicija juri server poziciju po framu
+// Veca vrednost = brze, ali ako je previse veliko ponovo se vide skokovi
+const LERP_OTHER  = 0.20;  // interpolacija za tudje igrace
+const LERP_PIECES = 0.30;  // interpolacija za sopstvene delove
+const LERP_CAM    = 0.09;
+const LERP_ZOOM   = 0.06;
 
-startBtn.addEventListener("click", startGame);
-modalInput.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") startGame();
-});
-
-function startGame() {
-  const name = modalInput.value.trim();
-  if (name.length === 0) {
-    alert("Unesi svoje ime!");
-    return;
+// ── Offscreen grid ───────────────────────────────────────────────────────────
+const gridC = document.createElement('canvas');
+const gridX = gridC.getContext('2d');
+function buildGrid() {
+  const s = 2600; gridC.width = gridC.height = s;
+  gridX.strokeStyle = 'rgba(26,58,92,.28)'; gridX.lineWidth = 1;
+  gridX.beginPath();
+  for (let i = 0; i <= s; i += 100) {
+    gridX.moveTo(i,0); gridX.lineTo(i,s);
+    gridX.moveTo(0,i); gridX.lineTo(s,i);
   }
-  playerName = name;
-  lastRadius = 0;
-  modal.style.display = "none";
-  document.querySelector(".main").style.display = "flex";
-  
-  // Čekaj da browser preuračuna veličine pre nego što se resize() pozove
-  requestAnimationFrame(() => {
-    resize();
-    connect();
-    draw();
-  });
+  gridX.stroke();
 }
 
-// Fokusiraj input na početku
-modalInput.focus();
+// ── Modal ────────────────────────────────────────────────────────────────────
+const modal = document.getElementById('modal');
+const ni    = document.getElementById('ni');
+document.getElementById('sb').onclick = go;
+ni.onkeypress = e => { if (e.key==='Enter') go(); };
+ni.focus();
+
+function go() {
+  const n = ni.value.trim(); if (!n) { alert('Unesi ime!'); return; }
+  playerName = n;
+  modal.style.display = 'none';
+  document.querySelector('.main').style.display = 'flex';
+  requestAnimationFrame(() => { resize(); buildGrid(); connect(); requestAnimationFrame(loop); });
+}
 
 function resize() {
-  canvas.width = document.getElementById("canvas-wrap").clientWidth;
-  canvas.height = document.getElementById("canvas-wrap").clientHeight;
+  canvas.width  = document.getElementById('cw').clientWidth;
+  canvas.height = document.getElementById('cw').clientHeight;
 }
-window.addEventListener("resize", resize);
-resize();
-
-window.addEventListener("mousemove", (e) => {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - rect.left;
-  mouse.y = e.clientY - rect.top;
+window.addEventListener('resize', resize); resize();
+window.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
 });
 
-function connect() {
-  ws = new WebSocket("ws://localhost:8765");
-  ws.onopen = () => {
-    document.getElementById("dot").classList.add("connected");
-    // Pošalji ime serveru
-    ws.send(JSON.stringify({ type: "set_name", name: playerName }));
-  };
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    if (msg.type === "init") {
-      selfState = msg.self;
-      selfState.name = playerName; // Postavi ime koje je korisnik unio
-      msg.players.forEach(p => others.set(p.id, p));
-      msg.food.forEach(f => food.set(f.id, f));
-      refreshList();
-      refreshLeaderboard();
-    } else if (msg.type === "food_update") {
-      food.delete(msg.eaten);
-      food.set(msg.new_item.id, msg.new_item);
-      if (selfState && msg.eater === selfState.id) selfState.radius = msg.new_radius;
-      else if (others.has(msg.eater)) others.get(msg.eater).radius = msg.new_radius;
-      refreshLeaderboard();
-    } else if (msg.type === "player_moved") {
-      if (others.has(msg.id)) {
-        let p = others.get(msg.id);
-        p.x = msg.x; p.y = msg.y; p.radius = msg.radius;
-      }
-      refreshLeaderboard();
-    } else if (msg.type === "player_eaten") {
-      // Ako JA budem pojedeno
-      if (selfState && msg.eaten_id === selfState.id) {
-        selfState.x = msg.eaten_new_pos.x;
-        selfState.y = msg.eaten_new_pos.y;
-        selfState.radius = msg.eaten_new_pos.radius;
-      }
-      // Ako neko drugi bude pojedeno
-      if (others.has(msg.eaten_id)) {
-        let eaten = others.get(msg.eaten_id);
-        eaten.x = msg.eaten_new_pos.x;
-        eaten.y = msg.eaten_new_pos.y;
-        eaten.radius = msg.eaten_new_pos.radius;
-      }
-      // Veći igrač se povećava
-      if (selfState && msg.eater_id === selfState.id) {
-        selfState.radius = msg.eater_new_radius;
-      } else if (others.has(msg.eater_id)) {
-        others.get(msg.eater_id).radius = msg.eater_new_radius;
-      }
-      refreshList();
-      refreshLeaderboard();
-    } else if (msg.type === "player_joined") {
-      others.set(msg.player.id, msg.player);
-      refreshList();
-      refreshLeaderboard();
-    } else if (msg.type === "player_left") {
-      others.delete(msg.id);
-      refreshList();
-      refreshLeaderboard();
-    }
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const lerp  = (a,b,t) => a + (b-a)*t;
+const clamp = (v,lo,hi) => v<lo?lo:v>hi?hi:v;
+
+function newPlayer(d) {
+  return {
+    id:d.id, name:d.name||'?', color:d.color||'#fff',
+    x:d.x, y:d.y, r:d.radius||22,      // render pozicija
+    sx:d.x, sy:d.y, sr:d.radius||22,    // server target
+    pieces: null
   };
 }
+const self = () => selfId ? players.get(selfId) : null;
 
-function draw() {
-  // Detektuj ako je igrač pojeden (radius resetovan na početnu vrednost)
-  if (selfState && lastRadius > 22 && selfState.radius === 22) {
-    // Igrač je pojeden! Vrati ga na početak
-    ws.close();
-    food.clear();
-    others.clear();
-    selfState = null;
-    lastRadius = 0;
-    document.querySelector(".main").style.display = "none";
-    modal.style.display = "flex";
-    modalInput.value = ""; // Očisti input za novo ime
-    modalInput.focus();
-    return;
-  }
-  
-  if (selfState) {
-    lastRadius = selfState.radius; // Prati trenutni radius
-    
-    // 1. Mehanika kretanja
-    const dx = mouse.x - canvas.width / 2;
-    const dy = mouse.y - canvas.height / 2;
-    const dist = Math.sqrt(dx*dx + dy*dy);
+// centar mase delova (koristeci render koordinate)
+function com(pieces) {
+  let sx=0,sy=0,ta=0;
+  for (const p of pieces) { const a=p.rr*p.rr; sx+=p.rx*a; sy+=p.ry*a; ta+=a; }
+  return ta>0 ? {x:sx/ta,y:sy/ta} : {x:pieces[0].rx,y:pieces[0].ry};
+}
 
-    if (dist > 5) { // Deadzone da ne treperi kad je miš u centru
-        // Fiksna brzina koja zavisi samo od veličine
-        const baseSpeed = 4; 
-        const speed = baseSpeed * Math.pow(selfState.radius / 22, -0.4); 
-        
-        // Ugao ka mišu
-        const angle = Math.atan2(dy, dx);
-        
-        // Pomeranje zasnovano na uglu (pravcu), ne na daljini miša
-        selfState.x += Math.cos(angle) * speed;
-        selfState.y += Math.sin(angle) * speed;
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+function connect() {
+  ws = new WebSocket('ws://localhost:8765');
+  ws.onopen  = () => { document.getElementById('dot').classList.add('on'); ws.send(JSON.stringify({type:'set_name',name:playerName})); };
+  ws.onclose = () => document.getElementById('dot').classList.remove('on');
+  ws.onmessage = e => onMsg(JSON.parse(e.data));
+}
+
+function onMsg(m) {
+  switch(m.type) {
+
+    case 'init': {
+      selfId = m.self.id;
+      const p = newPlayer(m.self); p.name = playerName;
+      players.set(selfId, p);
+      cam.x = tcam.x = p.x; cam.y = tcam.y = p.y;
+      m.players.forEach(d => players.set(d.id, newPlayer(d)));
+      m.food.forEach(f => foodMap.set(f.id, f));
+      m.viruses.forEach(v => viruses.push(v));
+      lbDirty();
+      break;
     }
 
-    selfState.x = Math.max(0, Math.min(WORLD_W, selfState.x));
-    selfState.y = Math.max(0, Math.min(WORLD_H, selfState.y));
+    case 'player_joined':
+      if (!players.has(m.player.id)) players.set(m.player.id, newPlayer(m.player));
+      lbDirty(); break;
 
-    // Kamera prati glatko
-    cam.x += (selfState.x - cam.x) * 0.1;
-    cam.y += (selfState.y - cam.y) * 0.1;
+    case 'player_left':
+      players.delete(m.id); lbDirty(); break;
 
-    if (ws.readyState === 1) ws.send(JSON.stringify({ type: "move", x: selfState.x, y: selfState.y }));
+    case 'player_updated': {
+      const p = players.get(m.player.id); if (p) p.name = m.player.name; break;
+    }
+
+    case 'food_update':
+      foodMap.delete(m.eaten); foodMap.set(m.new_item.id, m.new_item);
+      if (m.eater) {
+        const p = players.get(m.eater);
+        if (p && m.new_radius) { p.sr = m.new_radius; lbDirty(); }
+      }
+      // Kad deo splitovanog igraca pojede hranu, spu ce azurirati sr delova
+      // ali leaderboard treba i ovde da se osvezi
+      if (m.piece_owner) lbDirty();
+      break;
+
+    case 'player_moved': {
+      const p = players.get(m.id); if (!p || p.pieces) break;
+      if (m.id === selfId) {
+        if (m.radius > 0 && m.radius !== p.sr) { p.sr = m.radius; lbDirty(); }
+      } else {
+        p.sx=m.x; p.sy=m.y;
+        if (m.radius > 0 && m.radius !== p.sr) { p.sr = m.radius; lbDirty(); }
+      }
+      break;
+    }
+
+    // Inicijalni split — kreiraj pieces sa render poz = trenutna pozicija igraca
+    case 'player_split': {
+      const p = players.get(m.player_id); if (!p) break;
+      const n = m.pieces.length;
+      // rx/ry/rr pocinje od trenutne render pozicije igraca — nema skoka
+      // Za druge klijente p.x/p.y je vec interpolirana pozicija
+      const startX = p.pieces ? (p.pieces[0]?.rx ?? p.x) : p.x;
+      const startY = p.pieces ? (p.pieces[0]?.ry ?? p.y) : p.y;
+      const startR = p.r || PLAYER_START_RADIUS;
+      p.pieces = m.pieces.map(pc => ({
+        id: pc.id,
+        sx: pc.x, sy: pc.y, sr: pc.radius,
+        rx: startX, ry: startY, rr: startR / Math.sqrt(n),
+        mt: pc.mt != null ? pc.mt : 10
+      }));
+      p.r = 0; p.sr = 0;
+      lbDirty();
+      break;
+    }
+
+    // Kompaktni tick update: [x, y, radius, merge_timer]
+    case 'spu': {
+      const p = players.get(m.pid); if (!p) break;
+      const inc = m.p;
+      if (!p.pieces || p.pieces.length !== inc.length) {
+        // Broj delova se promenio (spajanje u toku) ili pieces jos nije init
+        // rx/ry/rr = trenutna render poz ako postoji, inace server poz
+        p.pieces = inc.map((d, i) => {
+          const old = p.pieces && p.pieces[i];
+          return { id:'?', sx:d[0], sy:d[1], sr:d[2],
+                   rx: old ? old.rx : d[0], ry: old ? old.ry : d[1],
+                   rr: old ? old.rr : d[2], mt: d[3] };
+        });
+      } else {
+        for (let i = 0; i < inc.length; i++) {
+          const pc = p.pieces[i];
+          pc.sx=inc[i][0]; pc.sy=inc[i][1]; pc.sr=inc[i][2]; pc.mt=inc[i][3];
+        }
+      }
+      // Leaderboard update pri svakom tick-u (throttled = ne pravi lag)
+      lbDirty();
+      break;
+    }
+
+    case 'player_rejoin': {
+      const p = players.get(m.player_id); if (!p) break;
+      p.pieces = null;
+      if (m.new_pos) {
+        p.x=m.new_pos.x; p.sx=m.new_pos.x;
+        p.y=m.new_pos.y; p.sy=m.new_pos.y;
+        p.r=m.new_pos.radius; p.sr=m.new_pos.radius;
+      }
+      lbDirty(); break;
+    }
+
+    // Deo (ili vise delova) jednog igraca je pojeden
+    case 'piece_eaten': {
+      const owner = players.get(m.owner_id);
+      if (owner && owner.pieces) {
+        const eaten = new Set(m.eaten_piece_ids);
+        owner.pieces = owner.pieces.filter(pc => !eaten.has(pc.id));
+        if (owner.pieces.length === 0) {
+          owner.pieces = null;
+          owner.r = PLAYER_START_RADIUS; owner.sr = PLAYER_START_RADIUS;
+          owner.x = owner.sx = Math.random()*1800+100;
+          owner.y = owner.sy = Math.random()*1800+100;
+        }
+      }
+      // Eater dobija veci radius
+      const eater = players.get(m.eater_id);
+      if (eater) {
+        if (eater.pieces) {
+          // eater je splitovan — azuriraj najveci deo (aproksimacija)
+          const biggest = eater.pieces.reduce((a,b) => a.sr>b.sr?a:b, eater.pieces[0]);
+          if (biggest) biggest.sr = m.eater_new_radius;
+        } else {
+          eater.sr = m.eater_new_radius;
+        }
+      }
+      lbDirty();
+      break;
+    }
+
+    case 'player_eaten': {
+      const eaten = players.get(m.eaten_id);
+      if (eaten) {
+        eaten.pieces=null;
+        eaten.x=eaten.sx=m.eaten_new_pos.x;
+        eaten.y=eaten.sy=m.eaten_new_pos.y;
+        eaten.r=eaten.sr=m.eaten_new_pos.radius;
+      }
+      const eater = players.get(m.eater_id);
+      if (eater) eater.sr = m.eater_new_radius;
+      lbDirty(); break;
+    }
+  }
+}
+
+// ── Leaderboard ───────────────────────────────────────────────────────────────
+let _lbT = null;
+function lbDirty() { if (!_lbT) _lbT = setTimeout(() => { renderLb(); _lbT=null; }, 300); }
+let _lastSelfScore = 0;
+const lbEl = document.getElementById('lb');
+const LBN  = 8; const lbRows = [];
+{
+  const h = document.createElement('h4'); h.textContent='🏆 TOP 8'; lbEl.appendChild(h);
+  for (let i=0;i<LBN;i++) {
+    const row=document.createElement('div'); row.className='lbr'; row.style.display='none';
+    const rk=document.createElement('span'); rk.className='rk';
+    const nm=document.createElement('span'); nm.className='nm';
+    const sc=document.createElement('span'); sc.className='sc';
+    row.append(rk,nm,sc); lbEl.appendChild(row); lbRows.push({row,rk,nm,sc});
+  }
+}
+function score(p) {
+  // Koristimo server radius (sr) — uvek azuran, za razliku od render (rr) koji kasni
+  if (p.pieces && p.pieces.length > 0)
+    return Math.sqrt(p.pieces.reduce((s, pc) => s + pc.sr * pc.sr, 0));
+  return p.sr || p.r;
+}
+function renderLb() {
+  const all = [...players.values()].sort((a,b)=>score(b)-score(a));
+  for (let i=0;i<LBN;i++) {
+    const {row,rk,nm,sc} = lbRows[i];
+    if (i<all.length) {
+      const p=all[i]; const me=p.id===selfId;
+      row.style.display='flex'; row.className='lbr'+(me?' me':'');
+      rk.textContent=(i+1)+'.'; nm.textContent=p.name; sc.textContent=Math.floor(score(p));
+    } else row.style.display='none';
+  }
+}
+
+// ── Crtanje helpers ───────────────────────────────────────────────────────────
+const FC = {};
+const font = sz => FC[sz] || (FC[sz]=`bold ${sz}px 'Share Tech Mono'`);
+
+function vis(wx,wy,r) {
+  const sx=(wx-cam.x)*cam.zoom+canvas.width/2;
+  const sy=(wy-cam.y)*cam.zoom+canvas.height/2;
+  const sr=r*cam.zoom;
+  return sx+sr>0 && sx-sr<canvas.width && sy+sr>0 && sy-sr<canvas.height;
+}
+function circle(x,y,r,fill,stroke,lw) {
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fillStyle=fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.stroke(); }
+}
+function label(x,y,r,name) {
+  const sz=clamp(Math.floor(r*.5),9,16);
+  ctx.font=font(sz); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(name,x,y);
+}
+
+// Virus spike trig unapred izracunata
+const VS=12, vsp=[];
+for(let i=0;i<VS;i++) {
+  const a1=Math.PI*2/VS*i, a2=Math.PI*2/VS*(i+.5), a3=Math.PI*2/VS*(i+1);
+  vsp.push([Math.cos(a1),Math.sin(a1),Math.cos(a2),Math.sin(a2),Math.cos(a3),Math.sin(a3)]);
+}
+function drawVirus(v) {
+  const ro=v.radius+10;
+  ctx.beginPath();
+  for (let i=0;i<VS;i++) {
+    const [c1,s1,c2,s2]=vsp[i];
+    const [c3,s3]=vsp[(i+1)%VS];
+    if (i===0) ctx.moveTo(v.x+c1*v.radius, v.y+s1*v.radius);
+    else        ctx.lineTo(v.x+c1*v.radius, v.y+s1*v.radius);
+    ctx.lineTo(v.x+c2*ro, v.y+s2*ro);
+    ctx.lineTo(v.x+c3*v.radius, v.y+s3*v.radius);
+  }
+  ctx.closePath();
+  ctx.fillStyle='#2ecc71'; ctx.fill();
+  ctx.strokeStyle='#27ae60'; ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); ctx.arc(v.x,v.y,v.radius*.65,0,Math.PI*2);
+  ctx.fillStyle='#1abc9c'; ctx.fill();
+}
+
+// ── Game loop ─────────────────────────────────────────────────────────────────
+let lastT = 0;
+function loop(now) {
+  const dt = Math.min((now - lastT) / 1000, 0.05);
+  lastT = now;
+  const me = self();
+
+  // ── Lokalno kretanje (samo kad nije splitovan) ────────────────────────────
+  if (me && !me.pieces) {
+    const dx = mouse.x - canvas.width/2;
+    const dy = mouse.y - canvas.height/2;
+    const d  = Math.sqrt(dx*dx+dy*dy);
+    if (d > 5) {
+      const spd = 4 * Math.pow(Math.max(me.r,22)/22, -0.4);
+      me.x = clamp(me.x + dx/d*spd, 0, W);
+      me.y = clamp(me.y + dy/d*spd, 0, H);
+    }
+    me.r = lerp(me.r, me.sr, 0.3);
+    // Okini LB kad se sopstveni skor stvarno promeni (jedenje hrane)
+    const selfScore = Math.floor(score(me));
+    if (selfScore !== _lastSelfScore) { _lastSelfScore = selfScore; lbDirty(); }
   }
 
-  ctx.fillStyle = "#050a0f";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // ── Interpolacija svih igraca i delova ka server poziciji ────────────────
+  players.forEach(p => {
+    if (p.pieces) {
+      // Interpoluji svaki deo ka server poziciji
+      for (const pc of p.pieces) {
+        pc.rx = lerp(pc.rx, pc.sx, LERP_PIECES);
+        pc.ry = lerp(pc.ry, pc.sy, LERP_PIECES);
+        pc.rr = lerp(pc.rr, pc.sr, LERP_PIECES);
+      }
+    } else if (p.id !== selfId) {
+      p.x  = lerp(p.x,  p.sx, LERP_OTHER);
+      p.y  = lerp(p.y,  p.sy, LERP_OTHER);
+      p.r  = lerp(p.r,  p.sr, 0.25);
+    }
+  });
 
+  // ── Kamera ───────────────────────────────────────────────────────────────
+  if (me) {
+    let tx,ty,maxR;
+    if (me.pieces && me.pieces.length>0) {
+      const c = com(me.pieces);
+      tx=c.x; ty=c.y;
+      maxR = me.pieces.reduce((m,pc)=>Math.max(m,pc.rr),0);
+    } else {
+      tx=me.x; ty=me.y; maxR=me.r;
+    }
+    tcam.x=tx; tcam.y=ty;
+    tcam.zoom = clamp(200/(maxR+70), 0.25, 1.6);
+  }
+  cam.x    = lerp(cam.x,    tcam.x,    LERP_CAM);
+  cam.y    = lerp(cam.y,    tcam.y,    LERP_CAM);
+  cam.zoom = lerp(cam.zoom, tcam.zoom, LERP_ZOOM);
+
+  // ── Slanje serveru ────────────────────────────────────────────────────────
+  if (now - lastSend >= SEND_MS && ws && ws.readyState===1 && me) {
+    let sx, sy;
+    if (me.pieces && me.pieces.length>0) {
+      // Splitovan: world pozicija kursora
+      sx = cam.x + (mouse.x - canvas.width/2)  / cam.zoom;
+      sy = cam.y + (mouse.y - canvas.height/2) / cam.zoom;
+    } else {
+      sx = me.x; sy = me.y;
+    }
+    ws.send(JSON.stringify({type:'move',x:sx,y:sy}));
+    lastSend = now;
+  }
+
+  // ── Crtanje ──────────────────────────────────────────────────────────────
+  ctx.fillStyle='#050a0f';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.save();
-  ctx.translate(canvas.width/2 - cam.x, canvas.height/2 - cam.y);
+  ctx.translate(canvas.width/2, canvas.height/2);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-cam.x, -cam.y);
 
-  // Vidljiva granica sveta
-  ctx.strokeStyle = "#00d4ff";
-  ctx.lineWidth = 10;
-  ctx.strokeRect(0, 0, WORLD_W, WORLD_H);
-  
-  // Pozadinska mreža
-  ctx.strokeStyle = "rgba(26,58,92,0.3)";
-  ctx.lineWidth = 1;
-  for(let i=0; i<=WORLD_W; i+=100) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,WORLD_H); ctx.stroke(); }
-  for(let i=0; i<=WORLD_H; i+=100) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(WORLD_W,i); ctx.stroke(); }
+  ctx.drawImage(gridC, -300, -300);
+  ctx.strokeStyle='#00d4ff'; ctx.lineWidth=8/cam.zoom;
+  ctx.strokeRect(0,0,W,H);
 
   // Hrana
-  food.forEach(f => {
-    ctx.beginPath(); ctx.arc(f.x, f.y, 6, 0, Math.PI*2);
-    ctx.fillStyle = f.color; ctx.fill();
+  foodMap.forEach(f => {
+    if (!vis(f.x,f.y,8)) return;
+    ctx.beginPath(); ctx.arc(f.x,f.y,6,0,Math.PI*2);
+    ctx.fillStyle=f.color; ctx.fill();
   });
 
-  // Igrači
-  others.forEach(p => drawPlayer(p));
-  if (selfState) drawPlayer(selfState, true);
+  // Virusi
+  for (const v of viruses) {
+    if (vis(v.x,v.y,v.radius+12)) drawVirus(v);
+  }
+
+  // Skupi sve za crtanje (sortiraj po velicini: manji ispred)
+  const dl = [];
+  players.forEach(p => {
+    const isSelf = p.id===selfId;
+    if (p.pieces && p.pieces.length>0) {
+      for (const pc of p.pieces) {
+        if (vis(pc.rx,pc.ry,pc.rr))
+          dl.push({x:pc.rx,y:pc.ry,r:pc.rr,color:p.color,name:p.name,isSelf,mt:pc.mt});
+      }
+    } else if (p.r>0 && vis(p.x,p.y,p.r)) {
+      dl.push({x:p.x,y:p.y,r:p.r,color:p.color,name:p.name,isSelf});
+    }
+  });
+  dl.sort((a,b)=>a.r-b.r);
+
+  for (const d of dl) {
+    const stroke = d.isSelf ? '#fff' : 'rgba(255,255,255,.22)';
+    const lw     = (d.isSelf ? 3 : 1.5) / cam.zoom;
+    circle(d.x,d.y,d.r,d.color,stroke,lw);
+    if (d.r*cam.zoom > 12) label(d.x,d.y,d.r,d.name);
+
+    // Merge timer luk
+    if (d.isSelf && d.mt>0) {
+      const frac = clamp(d.mt/15,0,1);
+      ctx.beginPath();
+      ctx.arc(d.x,d.y,d.r+3/cam.zoom,-Math.PI/2,-Math.PI/2+Math.PI*2*(1-frac));
+      ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=2/cam.zoom; ctx.stroke();
+    }
+  }
 
   ctx.restore();
-  requestAnimationFrame(draw);
-}
-
-function drawPlayer(p, isSelf = false) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
-  ctx.fillStyle = p.color;
-  ctx.fill();
-  ctx.strokeStyle = isSelf ? "#fff" : "rgba(255,255,255,0.2)";
-  ctx.lineWidth = isSelf ? 3 : 1;
-  ctx.stroke();
-  
-  ctx.fillStyle = "#fff";
-  ctx.font = "bold 12px 'Share Tech Mono'";
-  ctx.textAlign = "center";
-  ctx.fillText(p.name, p.x, p.y + 5);
-  ctx.restore();
-}
-
-function refreshList() {
-  const list = document.getElementById("player-list");
-  list.innerHTML = "<h4>Igrači:</h4>";
-  const all = selfState ? [{...selfState, isSelf:true}, ...others.values()] : [...others.values()];
-  all.forEach(p => {
-    const div = document.createElement("div");
-    if(p.isSelf) div.className = "is-self";
-    div.textContent = p.name + " (" + Math.floor(p.radius) + ")";
-    list.appendChild(div);
-  });
-}
-
-function refreshLeaderboard() {
-  const board = document.getElementById("leaderboard");
-  board.innerHTML = "<h4>🏆 LEADERBOARD TOP 8</h4>";
-  
-  // Skupi sve igrače sa skorom (radius = score)
-  const all = selfState ? [{...selfState, isSelf:true}, ...others.values()] : [...others.values()];
-  
-  // Sortiraj po radiusu (većeg prvo)
-  all.sort((a, b) => b.radius - a.radius);
-  
-  // Prikaži samo top 8
-  const top8 = all.slice(0, 8);
-  top8.forEach((p, idx) => {
-    const entry = document.createElement("div");
-    entry.className = "leaderboard-entry";
-    if(p.isSelf) entry.style.backgroundColor = "rgba(0, 212, 255, 0.1)";
-    
-    const rank = document.createElement("span");
-    rank.className = "leaderboard-rank";
-    rank.textContent = (idx + 1) + ".";
-    
-    const name = document.createElement("span");
-    name.className = "leaderboard-name";
-    name.textContent = p.name;
-    
-    const score = document.createElement("span");
-    score.className = "leaderboard-score";
-    score.textContent = Math.floor(p.radius);
-    
-    entry.appendChild(rank);
-    entry.appendChild(name);
-    entry.appendChild(score);
-    board.appendChild(entry);
-  });
+  requestAnimationFrame(loop);
 }
 </script>
 </body>
