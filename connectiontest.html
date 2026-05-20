@@ -116,6 +116,31 @@ window.addEventListener('mousemove', e => {
   mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
 });
 
+// X = eject, Space = split
+// Throttle da ne flood-ujemo server
+let lastEject = 0, lastSplit = 0;
+window.addEventListener('keydown', e => {
+  if (!ws || ws.readyState !== 1) return;
+  const me = self();  if (!me) return;
+  const now = performance.now();
+
+  if (e.code === 'KeyX' && now - lastEject > 100) {
+    lastEject = now;
+    // Smer = od centra ekrana ka misu (= smer kretanja)
+    const tx = cam.x + (mouse.x - canvas.width/2)  / cam.zoom;
+    const ty = cam.y + (mouse.y - canvas.height/2) / cam.zoom;
+    ws.send(JSON.stringify({type:'eject', tx, ty}));
+  }
+
+  if (e.code === 'Space' && now - lastSplit > 150) {
+    e.preventDefault();
+    lastSplit = now;
+    const tx = cam.x + (mouse.x - canvas.width/2)  / cam.zoom;
+    const ty = cam.y + (mouse.y - canvas.height/2) / cam.zoom;
+    ws.send(JSON.stringify({type:'split_player', tx, ty}));
+  }
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const lerp  = (a,b,t) => a + (b-a)*t;
 const clamp = (v,lo,hi) => v<lo?lo:v>hi?hi:v;
@@ -177,9 +202,22 @@ function onMsg(m) {
         const p = players.get(m.eater);
         if (p && m.new_radius) { p.sr = m.new_radius; lbDirty(); }
       }
-      // Kad deo splitovanog igraca pojede hranu, spu ce azurirati sr delova
-      // ali leaderboard treba i ovde da se osvezi
       if (m.piece_owner) lbDirty();
+      break;
+
+    // Ejektovana hrana — dodaj u foodMap sa oznakom da je veca i u boji igraca
+    case 'food_ejected': {
+      const fi = m.item;
+      foodMap.set(fi.id, {id:fi.id, x:fi.x, y:fi.y, color:fi.color, ejected:true, r:fi.r});
+      break;
+    }
+
+    // Pokretna ejektovana hrana — samo azuriraj poziciju
+    case 'food_moved':
+      for (const [fid, fx, fy] of m.items) {
+        const f = foodMap.get(fid);
+        if (f) { f.x = fx; f.y = fy; }
+      }
       break;
 
     case 'player_moved': {
@@ -455,7 +493,8 @@ function loop(now) {
   // Hrana
   foodMap.forEach(f => {
     if (!vis(f.x,f.y,8)) return;
-    ctx.beginPath(); ctx.arc(f.x,f.y,6,0,Math.PI*2);
+    const fr = f.ejected ? (f.r || 12) : 6;
+    ctx.beginPath(); ctx.arc(f.x,f.y,fr,0,Math.PI*2);
     ctx.fillStyle=f.color; ctx.fill();
   });
 

@@ -173,6 +173,26 @@ async def game_tick():
     def queue(msg, exclude=None):
         outbox.append((json.dumps(msg), exclude))
 
+    # Pomeri ejektovanu hranu (ima vx/vy)
+    moved_food = []
+    for item in list(food_by_id.values()):
+        vx = item.get("vx", 0); vy = item.get("vy", 0)
+        if vx or vy:
+            item["vx"] = vx * 0.82; item["vy"] = vy * 0.82
+            nx = item["x"] + item["vx"] * dt * 60
+            ny = item["y"] + item["vy"] * dt * 60
+            if abs(nx-item["x"]) > 0.3 or abs(ny-item["y"]) > 0.3:
+                food_remove(item["id"])
+                item["x"] = clamp(nx, 5, WORLD_W-5)
+                item["y"] = clamp(ny, 5, WORLD_H-5)
+                food_add(item)
+                moved_food.append(item)
+            if abs(item["vx"]) < 0.2 and abs(item["vy"]) < 0.2:
+                item.pop("vx", None); item.pop("vy", None)
+    if moved_food:
+        queue({"type":"food_moved",
+               "items":[[f["id"],round(f["x"],1),round(f["y"],1)] for f in moved_food]})
+
     player_list = list(players.items())
 
     for ws, state in player_list:
@@ -275,6 +295,23 @@ async def tick_loop():
         await game_tick()
         await asyncio.sleep(max(0.0, interval-(loop.time()-t0)))
 
+_EJECT_MASS = 12.0
+_MIN_EJECT_R = 35.0
+
+def _do_eject(cell_x, cell_y, cell_r, tx, ty, color):
+    """Izbaci jedan komad hrane. Vraca (new_r, food_item) ili None."""
+    if cell_r < _MIN_EJECT_R: return None
+    dx = tx - cell_x; dy = ty - cell_y
+    d = math.hypot(dx, dy)
+    if d < 1: dx, dy = 1.0, 0.0; d = 1.0
+    nx, ny = dx/d, dy/d
+    fx = clamp(cell_x + nx*(cell_r*1.4 + _EJECT_MASS), _EJECT_MASS, WORLD_W-_EJECT_MASS)
+    fy = clamp(cell_y + ny*(cell_r*1.4 + _EJECT_MASS), _EJECT_MASS, WORLD_H-_EJECT_MASS)
+    new_r = max(_MIN_EJECT_R * 0.7, math.sqrt(max(cell_r**2 - _EJECT_MASS**2, 1)))
+    item = {"id":_gid(8),"x":fx,"y":fy,"color":color,
+            "vx":nx*22.0,"vy":ny*22.0,"r":_EJECT_MASS,"ejected":True}
+    return new_r, item
+
 # ── Handler ───────────────────────────────────────────────────────────────────
 async def handler(websocket):
     state = new_player()
@@ -337,12 +374,92 @@ async def handler(websocket):
                                      "x":p["x"],"y":p["y"],"radius":p["radius"]},
                                     exclude=websocket)
 
+            elif t == "eject":
+                try:
+                    p = players[websocket]
+                    tx = float(msg.get("tx", p.get("tx", p["x"])))
+                    ty = float(msg.get("ty", p.get("ty", p["y"])))
+                    ejects = []
+                    if not p["pieces"]:
+                        result = _do_eject(p["x"], p["y"], p["radius"], tx, ty, p["color"])
+                        if result:
+                            p["radius"], fi = result
+                            ejects.append(fi)
+                    else:
+                        for pc in list(p["pieces"]):  # list() da izbegnemo mutation tokom iter
+                            result = _do_eject(pc["x"], pc["y"], pc["radius"], tx, ty, p["color"])
+                            if result:
+                                pc["radius"], fi = result
+                                ejects.append(fi)
+                    for fi in ejects:
+                        food_add(fi)
+                        await broadcast({"type":"food_ejected","item":fi})
+                except Exception as _e:
+                    import traceback; traceback.print_exc()
+
+            elif t == "split_player":
+                p = players[websocket]
+                MIN_SPLIT_R = 40.0
+                tx = float(msg.get("tx", p["tx"]))
+                ty = float(msg.get("ty", p["ty"]))
+
+                def split_cell(cell, tx, ty):
+                    """Deli jednu ćeliju na dve, vraca novu ćeliju ili None."""
+                    if cell["radius"] < MIN_SPLIT_R: return None
+                    dx = tx - cell["x"]; dy = ty - cell["y"]
+                    d  = math.hypot(dx, dy)
+                    if d < 1: dx, dy = 1.0, 0.0; d = 1.0
+                    nx, ny = dx/d, dy/d
+                    new_r  = cell["radius"] / math.sqrt(2)
+                    speed  = 18.0
+                    new_pc = make_piece(p["id"],
+                        clamp(cell["x"]+nx*(new_r+2), new_r, WORLD_W-new_r),
+                        clamp(cell["y"]+ny*(new_r+2), new_r, WORLD_H-new_r),
+                        new_r, nx*speed, ny*speed, p["name"], p["color"])
+                    cell["radius"] = new_r
+                    # reset brzine originalne ćelije
+                    cell["vx"] = -nx*speed*0.2; cell["vy"] = -ny*speed*0.2
+                    return new_pc
+
+                new_pieces = []
+                if not p["pieces"]:
+                    # Normalan igrac — podeli u 2
+                    if p["radius"] >= MIN_SPLIT_R:
+                        base = {"id":p["id"]+"_b","x":p["x"],"y":p["y"],
+                                "radius":p["radius"],"vx":0.0,"vy":0.0,
+                                "mt":mt(p["radius"]/math.sqrt(2)),
+                                "name":p["name"],"color":p["color"]}
+                        new_pc = split_cell(base, tx, ty)
+                        if new_pc:
+                            base["id"] = p["id"]+"_a"
+                            base["mt"] = mt(base["radius"])
+                            p["pieces"] = [base, new_pc]
+                            p["radius"] = 0.0
+                            p["tx"] = tx; p["ty"] = ty
+                else:
+                    # Splitovan — podeli svaku ćeliju koja je dovoljno velika
+                    # ali ne preći MAX_PIECES ukupno
+                    to_split = [pc for pc in p["pieces"]
+                                if pc["radius"] >= MIN_SPLIT_R
+                                and len(p["pieces"])+len(new_pieces) < MAX_PIECES]
+                    for pc in to_split:
+                        if len(p["pieces"])+len(new_pieces) >= MAX_PIECES: break
+                        new_pc = split_cell(pc, tx, ty)
+                        if new_pc: new_pieces.append(new_pc)
+                    p["pieces"].extend(new_pieces)
+
+                if p["pieces"]:
+                    await broadcast({"type":"player_split","player_id":p["id"],
+                                     "pieces":p["pieces"]})
+
             elif t == "set_name":
                 players[websocket]["name"] = str(msg.get("name","Igrač"))[:15]
                 await broadcast({"type":"player_updated","player":players[websocket]})
 
     except Exception as e:
+        import traceback
         print(f"Err: {e}")
+        traceback.print_exc()
     finally:
         s = players.pop(websocket, None)
         if s: await broadcast({"type":"player_left","id":s["id"]})
