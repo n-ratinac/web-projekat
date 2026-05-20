@@ -89,6 +89,50 @@
         font-size: 11px;
         padding: 2px 0;
       }
+      /* ── Death / Respawn ekran ── */
+      #death-screen {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 10, 20, 0.88);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        pointer-events: all;
+      }
+      #death-screen h2 {
+        font: 900 52px "Segoe UI", Arial, sans-serif;
+        color: #ff7755;
+        margin-bottom: 8px;
+        text-shadow: 0 0 30px rgba(255, 100, 60, 0.6);
+      }
+      #death-screen .ds-label {
+        color: #888;
+        font: 15px sans-serif;
+        margin-bottom: 6px;
+      }
+      #death-screen .ds-score {
+        font: 700 32px Arial, sans-serif;
+        color: #fff;
+        margin-bottom: 28px;
+      }
+      #death-screen button {
+        background: #7ef7a0;
+        color: #111;
+        font: 700 17px sans-serif;
+        border: none;
+        padding: 13px 48px;
+        border-radius: 8px;
+        cursor: pointer;
+        letter-spacing: 1px;
+        box-shadow: 0 4px 24px rgba(126, 247, 160, 0.35);
+        transition: transform 0.1s, box-shadow 0.1s;
+      }
+      #death-screen button:hover {
+        transform: scale(1.05);
+        box-shadow: 0 6px 32px rgba(126, 247, 160, 0.55);
+      }
     </style>
   </head>
   <body>
@@ -106,6 +150,14 @@
       <ol id="leaderboard-list"></ol>
     </div>
     
+    <!-- Death / Respawn ekran -->
+    <div id="death-screen">
+      <h2>Pojeden si!</h2>
+      <p class="ds-label">Finalni skor</p>
+      <div class="ds-score" id="ds-score">0</div>
+      <button id="respawn-btn">Igraj ponovo</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
 
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
@@ -191,8 +243,14 @@
         });
 
         socket.on("death", () => {
-            alert("Pojeo si se! Osveži stranicu za novu igru.");
-            location.reload();
+            connected = false;
+            showDeathScreen();
+        });
+
+        socket.on("respawned", (data) => {
+            playerName = data.name;
+            connected = true;
+            hideDeathScreen();
         });
       };
 
@@ -211,6 +269,33 @@
           e.preventDefault();
           socket.emit("split", {});
         }
+      });
+
+      // ── Death screen ──────────────────────────────────────────────────────────
+      function showDeathScreen() {
+        const me = world.find((p) => p.name === playerName);
+        const finalScore = me
+          ? Math.round(me.cells ? me.cells.reduce((s, c) => s + c.mass, 0) : me.mass)
+          : 0;
+        document.getElementById("ds-score").textContent = finalScore;
+        document.getElementById("death-screen").style.display = "flex";
+        scoreHud.style.display = "none";
+        leaderboardEl.style.display = "none";
+      }
+
+      function hideDeathScreen() {
+        document.getElementById("death-screen").style.display = "none";
+        scoreHud.style.display = "block";
+        leaderboardEl.style.display = "block";
+      }
+
+      document.getElementById("respawn-btn").addEventListener("click", () => {
+        if (!socket) return;
+        // Resetuj lokalno stanje
+        world = [];
+        foodItems = [];
+        playerPos = { x: 0, y: 0 };
+        socket.emit("respawn", { name: playerName });
       });
 
       function sendDirection() {

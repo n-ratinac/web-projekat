@@ -50,6 +50,25 @@ async def split(sid, data):
     if sid in players:
         players[sid].split()
 
+# DODATO: respawn event handler — klijent šalje ime, server kreira novog igrača za isti sid
+@sio.event
+async def respawn(sid, data):
+    # Ako igrač već postoji (nije uklonjen), ukloni ga iz enginea
+    if sid in players:
+        engine.remove_player(players[sid])
+        del players[sid]
+
+    name = data.get("name", "Player")
+    x = random.randint(100, cfg['game']['width'] - 100)
+    y = random.randint(100, cfg['game']['height'] - 100)
+
+    player = Player(name, x, y)
+    players[sid] = player
+    engine.add_player(player)
+    inputs[sid] = (0, 0)
+    print(f"[respawn] {name} at ({x}, {y})")
+    await sio.emit("respawned", {"name": name}, to=sid)
+
 @sio.event
 async def disconnect(sid):
     if sid in players:
